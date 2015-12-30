@@ -36,7 +36,6 @@ void convertRGBToYCbCr(JpgData jDat, Pixel p, unsigned int numPixels);
 // free resources
 void disposeJpgData(JpgData *jdat);
 
-
 // simple utility and debugging functions
 static Pixel newPixBuf(int n); // creates a new pixel buffer with n pixels
 static int determineFileSize(FILE *f); // determines the size of a file
@@ -86,17 +85,25 @@ Pixel imageToRGB(const char *imageName, int *bufSize)
 	return pixBuf;
 }
 
+// main encoding process
 void encodeRGBToJpgDisk(const char *jpgFile, Pixel rgbBuffer, unsigned int numPixels, unsigned int width, unsigned int height)
 {
-	JpgData jD = NULL; // create object to hold info about the jpeg
-	preprocessJpg(jD, rgbBuffer, numPixels); // preprocess the image data
-	// DCT
+	JpgData jD = malloc(sizeof(jpegData)); // create object to hold info about the jpeg
 	
-	// Quantization
+	if (jD != NULL){
+		preprocessJpg(jD, rgbBuffer, numPixels); // preprocess the image data
+		// DCT
+		
+		// Quantization
 
-	// Huffman coding
+		// Huffman coding
 
-	// write binary contents to disk
+		// write binary contents to disk
+	}
+	
+	else{
+		printf("Unable to allocate memory to store jpeg data.\n");
+	}
 	
 }
 
@@ -135,11 +142,8 @@ void disposeJpgData(JpgData jdata)
 	free(jdata->Y);
 	free(jdata->Cb);
 	free(jdata->Cr);
+	free(jdata);
 }
-
-
-
-
 
 // static functions
 

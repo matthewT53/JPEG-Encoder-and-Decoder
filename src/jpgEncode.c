@@ -6,7 +6,170 @@
 */
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include <assert.h>
 
 #include "headers/jpgEncode.h"
 
+// #define DEBUG // debugging constant
+#define DEBUG_PRE // debugging constant for the preprocessing code
+
+typedef struct _jpegData{
+	// YCbCr data
+	char *Y;
+	char *Cb;
+	char *Cr;
+	
+	// common image properties
+	unsigned int width;
+	unsigned int height;
+
+
+} jpegData;
+
+/* ===================== JPEG ENCODING FUNCTIONS ===================*/
+// JPEG PREPROCESSING FUNCTION PROTOTYPES
+void preprocessJpg(JpgData jDat, Pixel p, unsigned int numPixels);
+void convertRGBToYCbCr(JpgData jDat, Pixel p, unsigned int numPixels);
+
+// free resources
+void disposeJpgData(JpgData *jdat);
+
+
+// simple utility and debugging functions
+static Pixel newPixBuf(int n); // creates a new pixel buffer with n pixels
+static int determineFileSize(FILE *f); // determines the size of a file
+
+// debugging output functions
+static void dbg_out_file(Pixel p, int size); // dumps the contents of buf into a file 
+
+// can easily be adapted to other image formats other than BMP - mainly used for testing
+Pixel imageToRGB(const char *imageName, int *bufSize)
+{
+	Pixel pixBuf = NULL;
+	int imageSize = 0, bytesRead = 0;
+	FILE *fp = fopen(imageName, "rb");
+	// unsigned char *pBuf = NULL; // store the pixel values (temp)
+	// int i = 0, j = 0;
+	int numberPixels = 0;
+	
+	if (fp == NULL){
+		printf("Error opening image file.\n");
+		exit(1); // terminate the process
+	}
+
+	imageSize = determineFileSize(fp) - 54; // det the size that our pixel buffer should be
+	assert(imageSize > 0); // make sure the image size is > 0
+	numberPixels = ceil(imageSize / 3); // # pixels required
+	pixBuf = newPixBuf(numberPixels); // create an empty pixel buffer
+	fseek(fp, 54, SEEK_SET); // seek 54 bytes from start of file
+	// pBuf = malloc(sizeof(unsigned char) * imageSize); // extract raw pixel data (bytes)
+	bytesRead = fread(pixBuf, sizeof(Colour), imageSize, fp); // read the RGB values into pixBuf
+	// is the code above dangerous???
+	*bufSize = numberPixels; // set the size of the buffer
+
+	// O(n) copy since there is padding in the Pixel DAT struct
+	/*for (i = 0; j < imageSize; i++){
+		pixBuf[i].r = pBuf[j++]; // set the red
+		pixBuf[i].g = pBuf[j++]; // set the green
+		pixBuf[i].b = pBuf[j++]; // j % 3 == 2 // set the blue
+	}*/
+	
+	#ifdef DEBUG
+		dbg_out_file(pixBuf, numberPixels);
+		printf("Bytes read: %d\n", bytesRead);
+		printf("Sizeof(pixBuf): %d\n", imageSize);
+		printf("# pixels: %d\n", numberPixels);
+	#endif
+	fclose(fp);
+	return pixBuf;
+}
+
+void encodeRGBToJpgDisk(const char *jpgFile, Pixel rgbBuffer, unsigned int numPixels, unsigned int width, unsigned int height)
+{
+	JpgData jD = NULL; // create object to hold info about the jpeg
+	preprocessJpg(jD, rgbBuffer, numPixels); // preprocess the image data
+	// DCT
+	
+	// Quantization
+
+	// Huffman coding
+
+	// write binary contents to disk
+	
+}
+
+/* ==================== JPG PREPROCESSING ======================*/
+void preprocessJpg(JpgData jDat, Pixel rgb, unsigned int numPixels)
+{
+	convertRGBToYCbCr(jDat, rgb, numPixels);
+	
+}
+
+void convertRGBToYCbCr(JpgData jDat, Pixel rgb, unsigned int numPixels)
+{
+	int i = 0;
+	// printf("Not yet implemented conversion space.\n");
+	jDat->Y = malloc(sizeof(char) * numPixels);
+	jDat->Cb = malloc(sizeof(char) * numPixels);
+	jDat->Cr = malloc(sizeof(char) * numPixels);
+
+	if (jDat->Y == NULL || jDat->Cb == NULL || jDat->Cr){
+		printf("Error allocating space for the jpeg data.\n");
+		exit(1); // return some error
+	}
+
+	// do the conversion
+	for (i = 0; i < numPixels; i++){
+		jDat->Y[i] = (0.299 * rgb->r) + (0.587 * rgb->g) + (0.114 * rgb->b);
+		jDat->Cb[i] = 128 - (0.168736 * rgb->r) - (0.331264 * rgb->g) + (0.5 * rgb->b);
+		jDat->Cr[i] = 128 + (0.5 * rgb->r) - (0.418688 * rgb->g) +
+	}
+
+}
+
+// free resources
+void disposeJpgData(JpgData jdata)
+{
+	free(jdata->Y);
+	free(jdata->Cb);
+	free(jdata->Cr);
+}
+
+
+
+
+
+// static functions
+
+static void dbg_out_file(Pixel p, int size)
+{
+	int i = 0;
+	for (i = 0; i < size; i++){
+		printf("[Pixel: %d]\n", i);
+		printf("R: %d\n", p[i].r);
+		printf("G: %d\n", p[i].g);
+		printf("B: %d\n", p[i].b);
+	}
+}
+
+static Pixel newPixBuf(int n)
+{
+	Pixel pBuf = malloc(sizeof(pixel) * n);
+	return pBuf;
+}
+
+static int determineFileSize(FILE *f)
+{
+    int pos;
+    int end;
+
+    pos = ftell (f);
+    fseek (f, 0, SEEK_END);
+    end = ftell (f);
+    fseek (f, pos, SEEK_SET);
+
+    return end;
+}
 

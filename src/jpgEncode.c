@@ -115,16 +115,16 @@ void convertRGBToYCbCr(JpgData jDat, Pixel rgb, unsigned int numPixels)
 	jDat->Cb = malloc(sizeof(char) * numPixels);
 	jDat->Cr = malloc(sizeof(char) * numPixels);
 
-	if (jDat->Y == NULL || jDat->Cb == NULL || jDat->Cr){
+	if (jDat->Y == NULL || jDat->Cb == NULL || jDat->Cr == NULL){
 		printf("Error allocating space for the jpeg data.\n");
 		exit(1); // return some error
 	}
 
-	// do the conversion
+	// do the conversion, RGB -> YCbCr
 	for (i = 0; i < numPixels; i++){
 		jDat->Y[i] = (0.299 * rgb->r) + (0.587 * rgb->g) + (0.114 * rgb->b);
 		jDat->Cb[i] = 128 - (0.168736 * rgb->r) - (0.331264 * rgb->g) + (0.5 * rgb->b);
-		jDat->Cr[i] = 128 + (0.5 * rgb->r) - (0.418688 * rgb->g) +
+		jDat->Cr[i] = 128 + (0.5 * rgb->r) - (0.418688 * rgb->g) - (0.081312 * rgb->b);
 	}
 
 }

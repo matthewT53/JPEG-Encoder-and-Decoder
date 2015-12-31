@@ -17,8 +17,8 @@
 
 typedef struct _jpegData{
 	// YCbCr data
-	char *Y;
-	char *Cb;
+	char *Y; // luminance (black and white comp)
+	char *Cb; // 
 	char *Cr;
 	
 	// common image properties
@@ -32,6 +32,7 @@ typedef struct _jpegData{
 // JPEG PREPROCESSING FUNCTION PROTOTYPES
 void preprocessJpg(JpgData jDat, Pixel p, unsigned int numPixels);
 void convertRGBToYCbCr(JpgData jDat, Pixel p, unsigned int numPixels);
+void form8By8Blocks(JpgData jDat, Pixel p, unsigned int numPixels);
 
 // free resources
 void disposeJpgData(JpgData *jdat);

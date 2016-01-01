@@ -12,7 +12,11 @@
 
 #include "headers/jpgEncode.h"
 
-// #define DEBUG // debugging constant
+// boolean constants
+#define TRUE 1
+#define FALSE 0
+
+#define DEBUG // debugging constant
 #define DEBUG_PRE // debugging constant for the preprocessing code
 
 typedef struct _jpegData{
@@ -32,10 +36,10 @@ typedef struct _jpegData{
 // JPEG PREPROCESSING FUNCTION PROTOTYPES
 void preprocessJpg(JpgData jDat, Pixel p, unsigned int numPixels);
 void convertRGBToYCbCr(JpgData jDat, Pixel p, unsigned int numPixels);
-void form8by8blocks(JpgData jDat, Pixel p, unsigned int numPixels);
+void form8by8blocks(JpgData jDat); // only need the YCbCr stuff
 
 // free resources
-void disposeJpgData(JpgData *jdat);
+void disposeJpgData(JpgData jdat);
 
 // simple utility and debugging functions
 static Pixel newPixBuf(int n); // creates a new pixel buffer with n pixels
@@ -90,6 +94,7 @@ Pixel imageToRGB(const char *imageName, int *bufSize)
 void encodeRGBToJpgDisk(const char *jpgFile, Pixel rgbBuffer, unsigned int numPixels, unsigned int width, unsigned int height)
 {
 	JpgData jD = malloc(sizeof(jpegData)); // create object to hold info about the jpeg
+
 	jD->width = width;
 	jD->height = height;
 	
@@ -114,7 +119,7 @@ void encodeRGBToJpgDisk(const char *jpgFile, Pixel rgbBuffer, unsigned int numPi
 void preprocessJpg(JpgData jDat, Pixel rgb, unsigned int numPixels)
 {
 	convertRGBToYCbCr(jDat, rgb, numPixels);
-	form8by8blocks(jDat, rgb, numPixels);
+	form8by8blocks(jDat);
 	
 	
 }
@@ -134,10 +139,35 @@ void convertRGBToYCbCr(JpgData jDat, Pixel rgb, unsigned int numPixels)
 
 	// do the conversion, RGB -> YCbCr
 	for (i = 0; i < numPixels; i++){
-		jDat->Y[i] = (0.299 * rgb->r) + (0.587 * rgb->g) + (0.114 * rgb->b);
-		jDat->Cb[i] = 128 - (0.168736 * rgb->r) - (0.331264 * rgb->g) + (0.5 * rgb->b);
-		jDat->Cr[i] = 128 + (0.5 * rgb->r) - (0.418688 * rgb->g) - (0.081312 * rgb->b);
+		jDat->Y[i] = (0.299 * rgb[i].r) + (0.587 * rgb[i].g) + (0.114 * rgb[i].b);
+		jDat->Cb[i] = 128 - (0.168736 * rgb[i].r) - (0.331264 * rgb[i].g) + (0.5 * rgb[i].b);
+		jDat->Cr[i] = 128 + (0.5 * rgb[i].r) - (0.418688 * rgb[i].g) - (0.081312 * rgb[i].b);
 	}
+
+	#ifdef DEBUG_PRE
+		printf("Printing YCbCr info: \n");
+		for (i = 0; i < numPixels; i++){
+			printf("[Pixel: %d]\n", i);
+			printf("Y: %d\n", jDat->Y[i]);
+			printf("Cb: %d\n", jDat->Cb[i]);
+			printf("Cr: %d\n", jDat->Cr[i]);
+		}
+	#endif
+
+}
+
+// onvert the image into 8 by 8 blocks
+void form8by8blocks(JpgData jDat)
+{/*
+	int fillWEdge = FALSE;
+	int fillHEdge = FALSE;
+	// test  width and height for divisibility by 8
+	if (jDat->width % 8 != 0){ fillWEdge = TRUE; }
+	if (jDat->height % 8 != 0) { fillHEdge = TRUE; }
+
+	printf("Not yet implemented 8x8 blocks\n");
+		
+*/
 
 }
 

@@ -32,7 +32,7 @@ typedef struct _jpegData{
 // JPEG PREPROCESSING FUNCTION PROTOTYPES
 void preprocessJpg(JpgData jDat, Pixel p, unsigned int numPixels);
 void convertRGBToYCbCr(JpgData jDat, Pixel p, unsigned int numPixels);
-void form8By8Blocks(JpgData jDat, Pixel p, unsigned int numPixels);
+void form8by8blocks(JpgData jDat, Pixel p, unsigned int numPixels);
 
 // free resources
 void disposeJpgData(JpgData *jdat);
@@ -90,6 +90,8 @@ Pixel imageToRGB(const char *imageName, int *bufSize)
 void encodeRGBToJpgDisk(const char *jpgFile, Pixel rgbBuffer, unsigned int numPixels, unsigned int width, unsigned int height)
 {
 	JpgData jD = malloc(sizeof(jpegData)); // create object to hold info about the jpeg
+	jD->width = width;
+	jD->height = height;
 	
 	if (jD != NULL){
 		preprocessJpg(jD, rgbBuffer, numPixels); // preprocess the image data
@@ -112,6 +114,8 @@ void encodeRGBToJpgDisk(const char *jpgFile, Pixel rgbBuffer, unsigned int numPi
 void preprocessJpg(JpgData jDat, Pixel rgb, unsigned int numPixels)
 {
 	convertRGBToYCbCr(jDat, rgb, numPixels);
+	form8by8blocks(jDat, rgb, numPixels);
+	
 	
 }
 

@@ -139,7 +139,7 @@ void convertRGBToYCbCr(JpgData jDat, Pixel rgb, unsigned int numPixels)
 
 	// do the conversion, RGB -> YCbCr
 	for (i = 0; i < numPixels; i++){
-		jDat->Y[i] = (0.299 * rgb[i].r) + (0.587 * rgb[i].g) + (0.114 * rgb[i].b);
+		jDat->Y[i] = (0.299 * rgb[i].r) + (0.587 * rgb[i].g) + (0.114 * rgb[i].b); // should these arrays be char or double
 		jDat->Cb[i] = 128 - (0.168736 * rgb[i].r) - (0.331264 * rgb[i].g) + (0.5 * rgb[i].b);
 		jDat->Cr[i] = 128 + (0.5 * rgb[i].r) - (0.418688 * rgb[i].g) - (0.081312 * rgb[i].b);
 	}
@@ -164,10 +164,10 @@ void form8by8blocks(JpgData jDat)
 	// test  width and height for divisibility by 8
 	if (jDat->width % 8 != 0){ fillWEdge = TRUE; }
 	if (jDat->height % 8 != 0) { fillHEdge = TRUE; }
-
+	*/
 	printf("Not yet implemented 8x8 blocks\n");
 		
-*/
+
 
 }
 

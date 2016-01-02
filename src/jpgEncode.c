@@ -19,17 +19,25 @@
 #define DEBUG // debugging constant
 #define DEBUG_PRE // debugging constant for the preprocessing code
 
+/*  To clear confusion, just in case.
+	Width: X direction
+	Height: Y direction
+*/
+
 typedef struct _jpegData{
 	// YCbCr data
 	char *Y; // luminance (black and white comp)
-	char *Cb; // 
+	char *Cb;
 	char *Cr;
+	
+	// 8 x 8 blocks storage of each channel (YCbCr)
+	char **YBlocks;
+	char **CbBlocks;
+	char **CrBlocks;
 	
 	// common image properties
 	unsigned int width;
 	unsigned int height;
-
-
 } jpegData;
 
 /* ===================== JPEG ENCODING FUNCTIONS ===================*/
@@ -37,6 +45,10 @@ typedef struct _jpegData{
 void preprocessJpg(JpgData jDat, Pixel p, unsigned int numPixels);
 void convertRGBToYCbCr(JpgData jDat, Pixel p, unsigned int numPixels);
 void form8by8blocks(JpgData jDat); // only need the YCbCr stuff
+
+// additional helper functions - help to make the image divisible by 8
+void fillWidth(JpgData jDat); // add another width line to the image
+void fillHeight(JpgData jDat); // add another height line to the image
 
 // free resources
 void disposeJpgData(JpgData jdat);
@@ -118,8 +130,8 @@ void encodeRGBToJpgDisk(const char *jpgFile, Pixel rgbBuffer, unsigned int numPi
 /* ==================== JPG PREPROCESSING ======================*/
 void preprocessJpg(JpgData jDat, Pixel rgb, unsigned int numPixels)
 {
-	convertRGBToYCbCr(jDat, rgb, numPixels);
-	form8by8blocks(jDat);
+	convertRGBToYCbCr(jDat, rgb, numPixels); // change the colour space
+	form8by8blocks(jDat); // split the image into 8x8 blocks
 	
 	
 }
@@ -156,32 +168,81 @@ void convertRGBToYCbCr(JpgData jDat, Pixel rgb, unsigned int numPixels)
 
 }
 
-// onvert the image into 8 by 8 blocks
+// convert the image into 8 by 8 blocks
 void form8by8blocks(JpgData jDat)
-{/*
+{
 	int fillWEdge = FALSE;
 	int fillHEdge = FALSE;
-	// test  width and height for divisibility by 8
+	int extraSpaceW = 0, extraSpaceH = 0;
+	int totalH = 0, totalW = 0;
+	int i = 0, j = 0;
+	
+	// printf("Not yet implemented 8x8 blocks\n");
+	// test width and height for divisibility by 8
 	if (jDat->width % 8 != 0){ fillWEdge = TRUE; }
 	if (jDat->height % 8 != 0) { fillHEdge = TRUE; }
-	*/
-	printf("Not yet implemented 8x8 blocks\n");
-		
-
-
+	
+	// determine how much we need to fill
+	if (fillWEdge){
+		extraSpaceW = (8 - (jDat->width % 8)) * jDat->width; // # pixels in width * number of columns (add to right of iamge)
+	}
+	
+	if (fillHEdge){
+		extraSpaceH = (8 - (jDat->height % 8)) * jDat->height; // add to bottom
+	}
+	
+	// calculate the total height and width of the image that is divisible by 8
+	totalH = jDat->height + extraSpaceH;
+	totalW = jDat->width + extraSpaceW;
+	
+	// get memory to store our blocks
+	jDat->YBlocks = malloc(sizeof(char *) * (totalH));
+	jDat->CbBlocks = malloc(sizeof(char *) * (totalH));
+	jDat->CrBlocks = malloc(sizeof(char *) * (totalH));
+	
+	if (jDat->YBlocks != NULL && jDat->CbBlocks != NULL && jDat->CrBlocks != NULL){
+		for (i = 0; i < jDat->height; i++){
+			jDat->YBlocks[i] = malloc(sizeof(char) * (totalW));
+			jDat->CbBlocks[i] = malloc(sizeof(char) *(totalW));
+			jDat->CrBlocks[i] = malloc(sizeof(char) * (totalW));
+			if (jDat->YBlocks[i] == NULL || jDat->CbBlocks[i] == NULL || jDat->CrBlocks[i] == NULL){
+				exit(1); // unable to get enough storage space for the 8x8 blocks so terminate program
+			}
+		}
+	}
+	
+	// fill the data in 8x8 blocks
+	for (i = 0; i < jDat->height; i++){
+		for (j = 0; j < jDat->width; j++){
+			
+		}
+	}
 }
 
 // free resources
 void disposeJpgData(JpgData jdata)
 {
+	int i = 0;
+	// free the YCbCr data
 	free(jdata->Y);
 	free(jdata->Cb);
 	free(jdata->Cr);
+	
+	// free the 8x8 blocks
+	for (i = 0; i < jdata->height; i++){
+		free(jdata->YBlocks[i]);
+		free(jdata->CbBlocks[i]);
+		free(jdata->CrBlocks[i]);
+	}
+	
+	free(jdata->YBlocks);
+	free(jdata->CbBlocks);
+	free(jdata->CrBlocks);
+	// free the whole struct
 	free(jdata);
 }
 
 // static functions
-
 static void dbg_out_file(Pixel p, int size)
 {
 	int i = 0;

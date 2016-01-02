@@ -7,6 +7,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <math.h>
 #include <assert.h>
 
@@ -47,8 +48,10 @@ void convertRGBToYCbCr(JpgData jDat, Pixel p, unsigned int numPixels);
 void form8by8blocks(JpgData jDat); // only need the YCbCr stuff
 
 // additional helper functions - help to make the image divisible by 8
-void fillWidth(JpgData jDat); // add another width line to the image
-void fillHeight(JpgData jDat); // add another height line to the image
+
+// changing width and height is ok since we can later modify it again in the header of the image
+void fillWidth(JpgData jDat, int nEdges); // extends the width of the image
+void fillHeight(JpgData jDat, int nEdges); // extends the height of the image
 
 // free resources
 void disposeJpgData(JpgData jdat);
@@ -132,8 +135,6 @@ void preprocessJpg(JpgData jDat, Pixel rgb, unsigned int numPixels)
 {
 	convertRGBToYCbCr(jDat, rgb, numPixels); // change the colour space
 	form8by8blocks(jDat); // split the image into 8x8 blocks
-	
-	
 }
 
 void convertRGBToYCbCr(JpgData jDat, Pixel rgb, unsigned int numPixels)
@@ -171,29 +172,34 @@ void convertRGBToYCbCr(JpgData jDat, Pixel rgb, unsigned int numPixels)
 // convert the image into 8 by 8 blocks
 void form8by8blocks(JpgData jDat)
 {
-	int fillWEdge = FALSE;
-	int fillHEdge = FALSE;
+	int fillWEdges = FALSE;
+	int fillHEdges = FALSE;
 	int extraSpaceW = 0, extraSpaceH = 0;
 	int totalH = 0, totalW = 0;
-	int i = 0, j = 0;
+	int i = 0, j = 0, k = 0;
 	
 	// printf("Not yet implemented 8x8 blocks\n");
 	// test width and height for divisibility by 8
-	if (jDat->width % 8 != 0){ fillWEdge = TRUE; }
-	if (jDat->height % 8 != 0) { fillHEdge = TRUE; }
+	if (jDat->width % 8 != 0){ fillWEdges = TRUE; }
+	if (jDat->height % 8 != 0) { fillHEdges = TRUE; }
 	
 	// determine how much we need to fill
-	if (fillWEdge){
+	if (fillWEdges){
 		extraSpaceW = (8 - (jDat->width % 8)) * jDat->width; // # pixels in width * number of columns (add to right of iamge)
 	}
 	
-	if (fillHEdge){
+	if (fillHEdges){
 		extraSpaceH = (8 - (jDat->height % 8)) * jDat->height; // add to bottom
 	}
 	
 	// calculate the total height and width of the image that is divisible by 8
 	totalH = jDat->height + extraSpaceH;
 	totalW = jDat->width + extraSpaceW;
+
+	#ifdef DEBUG_PRE
+		printf("fillWEdge = %d and fillHEdge = %d\n", fillWEdges, fillHEdges);
+		printf("totalW = %d and totalH = %d\n", totalW, totalH);
+	#endif
 	
 	// get memory to store our blocks
 	jDat->YBlocks = malloc(sizeof(char *) * (totalH));
@@ -214,7 +220,51 @@ void form8by8blocks(JpgData jDat)
 	// fill the data in 8x8 blocks
 	for (i = 0; i < jDat->height; i++){
 		for (j = 0; j < jDat->width; j++){
-			
+			jDat->YBlocks[i][j] = jDat->Y[k];
+			jDat->CbBlocks[i][j] = jDat->Cb[k];
+			jDat->CrBlocks[i][j] = jDat->Cr[k];
+			k++;
+		}
+	}
+
+	// add the necessary edges to the image
+	if (fillWEdges){
+		fillWidth(jDat, extraSpaceW);
+	}
+
+	if (fillHEdges){
+		fillHeight(jDat, extraSpaceH);
+	}
+}
+
+void fillWidth(JpgData jDat, int nEdges)
+{
+	//  extend the bottom width of the image
+	int h = jDat->height;
+	int i = 0;
+	char *baseLineY = jDat->YBlocks[h - 1];
+	char *baseLineCb = jDat->CbBlocks[h - 1];
+	char *baseLineCr = jDat->CrBlocks[h - 1];	
+	
+	for (i = h; i < h + nEdges; i++){
+		memcpy(jDat->YBlocks[i], baseLineY, jDat->width);
+		memcpy(jDat->CbBlocks[i], baseLineCb, jDat->width);
+		memcpy(jDat->CrBlocks[i], baseLineCr, jDat->width);
+	} 
+}
+
+void fillHeight(JpgData jDat, int nEdges)
+{
+	// printf("Not yet implemented.\n");
+	int w = jDat->width;
+	int i = 0, j = 0;
+	int baseIndexW = w - 1;
+
+	for (i = w; i < w + nEdges; i++){
+		for (j = 0; j < jDat->height; j++){
+			jDat->YBlocks[j][i] = jDat->YBlocks[j][baseIndexW];
+			jDat->CbBlocks[j][i] = jDat->CbBlocks[j][baseIndexW];
+			jDat->CrBlocks[j][i] = jDat->CrBlocks[j][baseIndexW];
 		}
 	}
 }

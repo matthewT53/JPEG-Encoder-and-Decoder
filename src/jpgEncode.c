@@ -18,11 +18,13 @@
 #define FALSE 0
 
 #define DEBUG // debugging constant
-#define DEBUG_PRE // debugging constant for the preprocessing code
+// #define DEBUG_PRE // debugging constant for the preprocessing code
+// #define DEBUG_BLOCKS // debugging constant for the code that creates 8x8 blocks
 
 /*  To clear confusion, just in case.
 	Width: X direction
 	Height: Y direction
+	Image is not down sampled for simplicity, will add this later
 */
 
 typedef struct _jpegData{
@@ -35,10 +37,20 @@ typedef struct _jpegData{
 	char **YBlocks;
 	char **CbBlocks;
 	char **CrBlocks;
+
+	int numBlocks; // counts the number of 8x8 blocks in the image
+	
+	// DCT step, 
+	
+	// Quantization step
 	
 	// common image properties
 	unsigned int width;
 	unsigned int height;
+
+	// new width and height that is divisible by 8
+	unsigned int totalWidth;
+	unsigned int totalHeight;
 } jpegData;
 
 /* ===================== JPEG ENCODING FUNCTIONS ===================*/
@@ -46,8 +58,26 @@ typedef struct _jpegData{
 void preprocessJpg(JpgData jDat, Pixel p, unsigned int numPixels);
 void convertRGBToYCbCr(JpgData jDat, Pixel p, unsigned int numPixels);
 void form8by8blocks(JpgData jDat); // only need the YCbCr stuff
+void levelShift(JpgData jDat); // subtract 128 from YCbCr channels to make DCT efficient
 
-// additional helper functions - help to make the image divisible by 8
+// DCT
+void dct(JpgData jDat); // applies discrete cosine transformation to the YCbCr channels
+
+
+
+
+
+
+
+
+
+
+/* ================== END of Encoding functions ==================== */
+
+/* ================== Additional utility functions ========================= */
+
+// get the x and y index of a certain # block
+void getBlockIndex();
 
 // changing width and height is ok since we can later modify it again in the header of the image
 void fillWidth(JpgData jDat, int nEdges); // extends the width of the image
@@ -62,6 +92,9 @@ static int determineFileSize(FILE *f); // determines the size of a file
 
 // debugging output functions
 static void dbg_out_file(Pixel p, int size); // dumps the contents of buf into a file 
+
+
+
 
 // can easily be adapted to other image formats other than BMP - mainly used for testing
 Pixel imageToRGB(const char *imageName, int *bufSize)
@@ -115,10 +148,9 @@ void encodeRGBToJpgDisk(const char *jpgFile, Pixel rgbBuffer, unsigned int numPi
 	
 	if (jD != NULL){
 		preprocessJpg(jD, rgbBuffer, numPixels); // preprocess the image data
-		// DCT
-		
+		dct(jD); // DCT	
 		// Quantization
-
+		
 		// Huffman coding
 
 		// write binary contents to disk
@@ -135,6 +167,7 @@ void preprocessJpg(JpgData jDat, Pixel rgb, unsigned int numPixels)
 {
 	convertRGBToYCbCr(jDat, rgb, numPixels); // change the colour space
 	form8by8blocks(jDat); // split the image into 8x8 blocks
+	//levelShift(jDat); // subtract 127 from each value
 }
 
 void convertRGBToYCbCr(JpgData jDat, Pixel rgb, unsigned int numPixels)
@@ -196,7 +229,7 @@ void form8by8blocks(JpgData jDat)
 	totalH = jDat->height + extraSpaceH;
 	totalW = jDat->width + extraSpaceW;
 
-	#ifdef DEBUG_PRE
+	#ifdef DEBUG_BLOCKS
 		printf("fillWEdge = %d and fillHEdge = %d\n", fillWEdges, fillHEdges);
 		printf("totalW = %d and totalH = %d\n", totalW, totalH);
 	#endif
@@ -208,9 +241,9 @@ void form8by8blocks(JpgData jDat)
 	
 	if (jDat->YBlocks != NULL && jDat->CbBlocks != NULL && jDat->CrBlocks != NULL){
 		for (i = 0; i < jDat->height; i++){
-			jDat->YBlocks[i] = malloc(sizeof(char) * (totalW));
-			jDat->CbBlocks[i] = malloc(sizeof(char) *(totalW));
-			jDat->CrBlocks[i] = malloc(sizeof(char) * (totalW));
+			jDat->YBlocks[i] = calloc(totalW, sizeof(char));
+			jDat->CbBlocks[i] = calloc(totalW, sizeof(char));
+			jDat->CrBlocks[i] = calloc(totalW, sizeof(char));
 			if (jDat->YBlocks[i] == NULL || jDat->CbBlocks[i] == NULL || jDat->CrBlocks[i] == NULL){
 				exit(1); // unable to get enough storage space for the 8x8 blocks so terminate program
 			}
@@ -235,6 +268,35 @@ void form8by8blocks(JpgData jDat)
 	if (fillHEdges){
 		fillHeight(jDat, extraSpaceH);
 	}
+
+	jDat->totalWidth = totalW;
+	jDat->totalHeight = totalH;
+
+	#ifdef DEBUG_BLOCKS
+		printf("Showing luminance first: \n");
+		for (i = 0; i < totalH; i++){
+			for (j = 0; j < totalW; j++){
+				printf("%4d", jDat->YBlocks[i][j]);
+			}
+			printf("\n");
+		}
+		
+		printf("\n\nNow showing Cb comp: \n");
+		for (i = 0; i < totalH; i++){
+			for (j = 0; j < totalW; j++){
+				printf("%4d", jDat->CbBlocks[i][j]);
+			}
+			printf("\n");
+		}
+
+		printf("\n\nNow showing Cr comp: \n");
+		for (i = 0; i < totalH; i++){
+			for (j = 0; j < totalW; j++){
+				printf("%4d", jDat->CrBlocks[i][j]);
+			}
+			printf("\n");
+		}
+	#endif
 }
 
 void fillWidth(JpgData jDat, int nEdges)
@@ -268,6 +330,29 @@ void fillHeight(JpgData jDat, int nEdges)
 		}
 	}
 }
+
+/*
+// might not be required
+void levelShift(JpgData jDat)
+{
+	int i = 0, j = 0;
+
+	for (i = 0; i < jDat->totalHeight; i++){
+		for (j = 0; j < jDat->totalWidth; j++){
+			jDat->YBlocks[i][j] -= 128;
+			jDat->CbBlocks[i][j] -= 128;
+			jDat->CrBlocks[i][j] -= 128;
+		}
+	}
+}
+*/
+
+// applies dicrete cosine transformation to the image
+void dct(JpgData jDat)
+{
+	printf("Will implement tomorrow.\n");
+}
+
 
 // free resources
 void disposeJpgData(JpgData jdata)

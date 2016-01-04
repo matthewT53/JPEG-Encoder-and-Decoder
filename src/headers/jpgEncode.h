@@ -10,6 +10,7 @@
 typedef unsigned char Colour;
 typedef struct _pixel *Pixel;
 typedef struct _jpegData *JpgData;
+typedef char Byte;
 
 typedef struct _pixel{ // RGB pixel
 	Colour r; // red
@@ -27,7 +28,7 @@ void encodeRGBToJpgDisk(const char *jpgFile, Pixel rgbBuffer, unsigned int numPi
 
 // given an array of RGB pixels, this function does the same as above instead holds the jpeg in memory
 // remember to free the jpeg object
-void encodeRGBToJpgMem(Pixel rgbBuffer, unsigned int numPixels, unsigned int width, unsigned int height);
+Byte *encodeRGBToJpgMem(Pixel rgbBuffer, unsigned int numPixels, unsigned int width, unsigned int height);
 void disposeJpeg(); // use this function to free the jpeg image in memory
 
 #endif

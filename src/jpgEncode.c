@@ -25,6 +25,10 @@
 	Width: X direction
 	Height: Y direction
 	Image is not down sampled for simplicity, will add this later
+
+
+	Sources that assisted me:
+	* https://en.wikipedia.org/wiki/JPEG
 */
 
 typedef struct _jpegData{
@@ -37,12 +41,12 @@ typedef struct _jpegData{
 	char **YBlocks;
 	char **CbBlocks;
 	char **CrBlocks;
-
+	
+	// DCT / Quantization step
+	char **quanY;
+	char **quanCb;
+	char **quanCr;
 	int numBlocks; // counts the number of 8x8 blocks in the image
-	
-	// DCT step, 
-	
-	// Quantization step
 	
 	// common image properties
 	unsigned int width;
@@ -61,13 +65,28 @@ void form8by8blocks(JpgData jDat); // only need the YCbCr stuff
 void levelShift(JpgData jDat); // subtract 128 from YCbCr channels to make DCT efficient
 
 // DCT
-void dct(JpgData jDat); // applies discrete cosine transformation to the YCbCr channels
+/*
+	* Applies discrete cosine transformation to the YCbCr channels (DCT-II)
+	* Also applies the quantization step to the DCT blocks
+	* Note only part of the image wil be stored in a DCT buffer (memory efficient)
+*/
+void dct(JpgData jDat); 
 
+/*
+	Input:
+	* bn = block number 0 < bn <= numBlocks
 
+	Output:
+	* x[0] = startX, x[1] = endX
+	* y[0] = startY, y[1] = endY
 
+	Note: Don't forget to free() x and y
 
+*/
+void blockToCoords(int bn, int *x, int *y);
 
-
+// Quantization
+// void quantise(char **dct, char **q);
 
 
 
@@ -149,8 +168,9 @@ void encodeRGBToJpgDisk(const char *jpgFile, Pixel rgbBuffer, unsigned int numPi
 	if (jD != NULL){
 		preprocessJpg(jD, rgbBuffer, numPixels); // preprocess the image data
 		dct(jD); // DCT	
-		// Quantization
-		
+
+		// entropy coding
+
 		// Huffman coding
 
 		// write binary contents to disk
@@ -350,7 +370,70 @@ void levelShift(JpgData jDat)
 // applies dicrete cosine transformation to the image
 void dct(JpgData jDat)
 {
-	printf("Will implement tomorrow.\n");
+	// printf("Will implement tomorrow.\n");
+	int u = 0, v = 0;
+	int i = 0, j = 0;
+
+	int curBlock = 0;
+	int startX = 0, endX = 0;
+	int startY = 0, endY = 0;
+	int *sX = NULL , *sY = NULL;
+
+	// DCT coefficient
+	double dctCY = 0.0;
+	double dctCCb = 0.0;
+	double dctCCr = 0.0;
+
+	// create the dct 8x8 array
+
+	for (curBlock = 1; curBlock <= jDat->numBlocks; curBlock++){
+		blockToCoords(curBlock, sX, sY);
+		startX = sX[0]; endX = sX[1]; // get the starting + ending x coordinates 
+		startY = sY[0]; endY = sY[1]; // get the starting + ending y coordinates
+		for (u = startX; u < endX; u++){ // calculate DCT for G(u,v)
+			for (v = startY; v < endY; v++){
+				dctCY = 0.0;
+				dctCCb = 0.0;
+				dctCCr = 0.0;
+				for (i = startX; i < endX; i++){ // calculate g(x,y)
+					for (j = startY; j < endY; j++){
+						dctCY += jDat->YBlocks[j][i] * cos(((2 * i) * u * PI) / 16) * cos(((2 * j) * v * PI) / 16);
+						dctCCb += jDat->CbBlocks[j][i] * cos(((2 * i) * u * PI) / 16) * cos(((2 * j) * v * PI) / 16);
+						dctCCr += jDat->CrBlocks[j][i] * cos(((2 * i) * u * PI) / 16) * cos(((2 * j) * v * PI) / 16);
+					}
+				}
+				// finalise the dct coefficient
+				dctCY = (1/4) * A(u) * A(v) * dctCY;
+				dctCCb = (1/4) * A(u) * A(v) * dctCCb;
+				dctCCr = (1/4) * A(u) * A(v) * dctCCr;
+			}
+			// write the coefficient to the dct block
+		}
+
+		// quantise the 8x8 block
+	}	
+}
+
+// converts block number to starting and ending coordinates (x,y)
+void blockToCoords(int bn, int *x, int *y)
+{
+	unsigned int h = jDat->totalHeight;
+	unsigned int w = jDat->totalWidth;
+	
+	unsigned int tw = w * (unsigned int) bn;
+	
+	// don't forget to check that bn < numBlocks
+	x = calloc(2, sizeof(int));
+	y = calloc(2, sizeof(int));
+
+	// set the starting and ending y values
+	y[0] = tw / w;
+	y[1] = y[0] + 8;
+
+	// set the starting and ending x values
+	x[0] = (tw % 32) - 8;
+	if (x[0] == -8) { x[0] = w - 8; } // in last column, maths doesn't make sense
+	x[1] = x[0] + 8;
 }
 
 

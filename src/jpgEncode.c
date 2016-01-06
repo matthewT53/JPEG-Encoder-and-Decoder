@@ -17,6 +17,10 @@
 #define TRUE 1
 #define FALSE 0
 
+// DCT macros and constants
+#define A(x) (x == 0) ? sqrt(1/2) : 1)
+#define PI M_PI // pi constant as defined in math.h
+
 #define DEBUG // debugging constant
 // #define DEBUG_PRE // debugging constant for the preprocessing code
 // #define DEBUG_BLOCKS // debugging constant for the code that creates 8x8 blocks
@@ -291,6 +295,7 @@ void form8by8blocks(JpgData jDat)
 
 	jDat->totalWidth = totalW;
 	jDat->totalHeight = totalH;
+	jDat->numBlocks = (totalW / 8) * (totalH / 8);
 
 	#ifdef DEBUG_BLOCKS
 		printf("Showing luminance first: \n");
@@ -380,37 +385,72 @@ void dct(JpgData jDat)
 	int *sX = NULL , *sY = NULL;
 
 	// DCT coefficient
-	double dctCY = 0.0;
-	double dctCCb = 0.0;
-	double dctCCr = 0.0;
+	double dctCYCoef = 0.0;
+	double dctCCbCoef = 0.0;
+	double dctCCrCoef = 0.0;
 
-	// create the dct 8x8 array
+	// create the dct 8x8 arrays
+	double **dctY = NULL;
+	double **dctCb = NULL;
+	double **dctCr = NULL;
+
+	dctY = malloc(sizeof(double *) * jDat->totalHeight);
+	dctCb = malloc(sizeof(double *) * jDat->totalHeight);
+	dctCr = malloc(sizeof(double *) * jDat->totalHeight);
+
+	for (i = 0; i < jDat->totalHeight; i++){
+		dctY[i] = calloc(jDat->totalWidth, sizeof(double));
+		dctCb[i] = calloc(jDat->totalWidth, sizeof(double));
+		dctCr[i] = calloc(jDat->totalWidth, sizeof(double));
+	}
+
+	// create the quantization arrays
+	jDat->quanY = malloc(sizeof(char *) * jDat->totalHeight);
+	jDat->quanCb = malloc(sizeof(char *) * jDat->totalHeight);
+	jDat->quanCr = malloc(sizeof(char *) * jDat->totalHeight);
+
+	for (i = 0; i < jDat->totalHeight; i++){
+		jDat->quanY[i] = calloc(jDat->totalWidth, sizeof(char));
+		jDat->quanCb[i] = calloc(jDat->totalWidth, sizeof(char));
+		jDat->quanCr[i] = calloc(jDat->totalWidth, sizeof(char));
+	}
 
 	for (curBlock = 1; curBlock <= jDat->numBlocks; curBlock++){
 		blockToCoords(curBlock, sX, sY);
 		startX = sX[0]; endX = sX[1]; // get the starting + ending x coordinates 
 		startY = sY[0]; endY = sY[1]; // get the starting + ending y coordinates
-		for (u = startX; u < endX; u++){ // calculate DCT for G(u,v)
-			for (v = startY; v < endY; v++){
-				dctCY = 0.0;
-				dctCCb = 0.0;
-				dctCCr = 0.0;
+		for (u = 0; u < 8; u++){ // calculate DCT for G(u,v)
+			for (v = 0; v < 8; v++){
+				dctCYCoef = 0.0;
+				dctCCbCoef = 0.0;
+				dctCCrCoef = 0.0;
 				for (i = startX; i < endX; i++){ // calculate g(x,y)
 					for (j = startY; j < endY; j++){
-						dctCY += jDat->YBlocks[j][i] * cos(((2 * i) * u * PI) / 16) * cos(((2 * j) * v * PI) / 16);
-						dctCCb += jDat->CbBlocks[j][i] * cos(((2 * i) * u * PI) / 16) * cos(((2 * j) * v * PI) / 16);
-						dctCCr += jDat->CrBlocks[j][i] * cos(((2 * i) * u * PI) / 16) * cos(((2 * j) * v * PI) / 16);
+						dctCYCoef += jDat->YBlocks[j][i] * cos(((2 * (i % 8)) * u * PI) / 16) * cos(((2 * (j % 8)) * v * PI) / 16);
+						dctCCbCoef += jDat->CbBlocks[j][i] * cos(((2 * (i % 8)) * u * PI) / 16) * cos(((2 * (j % 8)) * v * PI) / 16);
+						dctCCrCoef += jDat->CrBlocks[j][i] * cos(((2 * (i % 8)) * u * PI) / 16) * cos(((2 * (j % 8)) * v * PI) / 16);
 					}
 				}
 				// finalise the dct coefficient
-				dctCY = (1/4) * A(u) * A(v) * dctCY;
-				dctCCb = (1/4) * A(u) * A(v) * dctCCb;
-				dctCCr = (1/4) * A(u) * A(v) * dctCCr;
+				dctCYCoef = (1/4) * A(u) * A(v) * dctCYCoef;
+				dctCCbCoef = (1/4) * A(u) * A(v) * dctCCbCoef;
+				dctCCrCoef = (1/4) * A(u) * A(v) * dctCCrCoef;
+
+				// write the coefficient to the dct block
+				dctY[v][u] = dctCYCoef;
+				dctCb[v][u] = dctCbCoef;
+				dctCr[v][u] = dctCrCoef;
 			}
-			// write the coefficient to the dct block
 		}
 
 		// quantise the 8x8 block
+		
+
+		// free the coordinates array
+		free(sX);
+		free(sY);
+		sX = NULL;
+		sY= NULL;
 	}	
 }
 

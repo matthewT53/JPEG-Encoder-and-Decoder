@@ -24,15 +24,30 @@
 #define DEBUG // debugging constant
 // #define DEBUG_PRE // debugging constant for the preprocessing code
 // #define DEBUG_BLOCKS // debugging constant for the code that creates 8x8 blocks
+#define DEBUG_DCT // debugging constant for the dct process
 
-/*  To clear confusion, just in case.
+/*  
+	To clear confusion, just in case.
 	Width: X direction
 	Height: Y direction
 	Image is not down sampled for simplicity, will add this later
 
-
 	Sources that assisted me:
 	* https://en.wikipedia.org/wiki/JPEG
+	* http://www.dfrws.org/2008/proceedings/p21-kornblum_pres.pdf -> Quantization quality scaling
+
+	Algorithm:
+	1 < Q < 100 ( quality range );
+	s = (Q < 50) ? 5000/Q : 200 - 2Q;
+	Ts[i] (element in new quan table) = ( S * Tb[i] ( element in original quan table ) + 50 ) / 100;
+	
+	Note: 
+	* when Q = 50 there is no change
+	* the higher q is, the larger the file size
+
+	Things to do:
+	* add down sampling
+	* add support for quality scaling (user specifies a quality)
 */
 
 typedef struct _jpegData{
@@ -415,6 +430,10 @@ void dct(JpgData jDat)
 		jDat->quanCr[i] = calloc(jDat->totalWidth, sizeof(char));
 	}
 
+	#ifdef DEBUG_DCT
+		printf(""
+	#endif
+	// DCT main process:
 	for (curBlock = 1; curBlock <= jDat->numBlocks; curBlock++){
 		blockToCoords(curBlock, sX, sY);
 		startX = sX[0]; endX = sX[1]; // get the starting + ending x coordinates 
@@ -424,11 +443,11 @@ void dct(JpgData jDat)
 				dctCYCoef = 0.0;
 				dctCCbCoef = 0.0;
 				dctCCrCoef = 0.0;
-				for (i = startX; i < endX; i++){ // calculate g(x,y)
+				for (i = startX; i < endX; i++){
 					for (j = startY; j < endY; j++){
-						dctCYCoef += jDat->YBlocks[j][i] * cos(((2 * (i % 8)) * u * PI) / 16) * cos(((2 * (j % 8)) * v * PI) / 16);
-						dctCCbCoef += jDat->CbBlocks[j][i] * cos(((2 * (i % 8)) * u * PI) / 16) * cos(((2 * (j % 8)) * v * PI) / 16);
-						dctCCrCoef += jDat->CrBlocks[j][i] * cos(((2 * (i % 8)) * u * PI) / 16) * cos(((2 * (j % 8)) * v * PI) / 16);
+						dctCYCoef += jDat->YBlocks[j][i] * cos(((2 * (i % 8) + 1) * u * PI) / 16) * cos(((2 * (j % 8) + 1) * v * PI) / 16);
+						dctCCbCoef += jDat->CbBlocks[j][i] * cos(((2 * (i % 8) + 1) * u * PI) / 16) * cos(((2 * (j % 8) + 1) * v * PI) / 16);
+						dctCCrCoef += jDat->CrBlocks[j][i] * cos(((2 * (i % 8) + 1) * u * PI) / 16) * cos(((2 * (j % 8) + 1) * v * PI) / 16);
 					}
 				}
 				// finalise the dct coefficient

@@ -21,6 +21,9 @@
 #define A(x) ((x == 0) ? sqrt(0.5) : 1 )
 #define PI 3.14159265358979323846 // c99 standard dropped M_PI
 
+// quan matrix constants
+#define QUAN_MAT_SIZE 8
+
 // #define DEBUG // debugging constant
 // #define DEBUG_PRE // debugging constant for the preprocessing code
 // #define DEBUG_BLOCKS // debugging constant for the code that creates 8x8 blocks
@@ -46,8 +49,9 @@
 	* the higher q is, the larger the file size
 
 	Things to do:
-	* add down sampling
+	* add down sampling (might need to)
 	* add support for quality scaling (user specifies a quality)
+	
 */
 
 typedef struct _jpegData{
@@ -65,6 +69,7 @@ typedef struct _jpegData{
 	char **quanY;
 	char **quanCb;
 	char **quanCr;
+	int quality; // 1 < q < 100, default = 50
 	int numBlocks; // counts the number of 8x8 blocks in the image
 	
 	// common image properties
@@ -133,6 +138,15 @@ static int determineFileSize(FILE *f); // determines the size of a file
 static void dbg_out_file(Pixel p, int size); // dumps the contents of buf into a file 
 #endif
 
+// default jpeg quantization matrix for 50% quality
+static int quanMatrix[QUAN_MAT_SIZE][QUAN_MAT_SIZE] = {	{16, 11, 10, 16, 24, 40, 51, 61},	
+														{12, 12, 14, 19, 26, 58, 60, 55}, 
+														{14, 13, 16, 24, 40, 57, 69, 56}, 
+														{14, 17, 22, 29, 51, 87, 80, 62},
+														{18, 22, 37, 56, 68, 109, 103, 77}, 
+														{24, 35, 55, 64, 81, 104, 113, 92}, 
+														{49, 64, 78, 87, 103, 121, 120, 101},
+														{72, 92, 95, 98, 112, 100, 103, 99} };
 
 
 // can easily be adapted to other image formats other than BMP - mainly used for testing
@@ -188,7 +202,9 @@ void encodeRGBToJpgDisk(const char *jpgFile, Pixel rgbBuffer, unsigned int numPi
 	
 	if (jD != NULL){
 		preprocessJpg(jD, rgbBuffer, numPixels); // preprocess the image data
-		dct(jD); // DCT	
+
+		// DCT	
+		dct(jD);
 
 		// entropy coding
 

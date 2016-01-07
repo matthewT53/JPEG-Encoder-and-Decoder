@@ -21,9 +21,9 @@
 #define A(x) ((x == 0) ? sqrt(0.5) : 1 )
 #define PI 3.14159265358979323846 // c99 standard dropped M_PI
 
-#define DEBUG // debugging constant
+// #define DEBUG // debugging constant
 // #define DEBUG_PRE // debugging constant for the preprocessing code
-#define DEBUG_BLOCKS // debugging constant for the code that creates 8x8 blocks
+// #define DEBUG_BLOCKS // debugging constant for the code that creates 8x8 blocks
 #define DEBUG_DCT // debugging constant for the dct process
 
 /*  
@@ -129,8 +129,9 @@ static Pixel newPixBuf(int n); // creates a new pixel buffer with n pixels
 static int determineFileSize(FILE *f); // determines the size of a file
 
 // debugging output functions
+#ifdef DEBUG
 static void dbg_out_file(Pixel p, int size); // dumps the contents of buf into a file 
-
+#endif
 
 
 
@@ -156,6 +157,7 @@ Pixel imageToRGB(const char *imageName, int *bufSize)
 	fseek(fp, 54, SEEK_SET); // seek 54 bytes from start of file
 	// pBuf = malloc(sizeof(unsigned char) * imageSize); // extract raw pixel data (bytes)
 	bytesRead = fread(pixBuf, sizeof(Colour), imageSize, fp); // read the RGB values into pixBuf
+	if (bytesRead <= 0) { printf("Error reading from file.\n"); }
 	// is the code above dangerous???
 	*bufSize = numberPixels; // set the size of the buffer
 
@@ -466,7 +468,7 @@ void dct(JpgData jDat)
 				dctCrCoef = (0.25) * A(u) * A(v) * dctCrCoef;
 
 				#ifdef DEBUG_DCT
-					printf("%4.2f ", dctYCoef);
+					printf("%6.2f ", dctYCoef);
 				#endif
 
 				// write the coefficient to the dct block
@@ -540,6 +542,7 @@ void disposeJpgData(JpgData jdata)
 }
 
 // static functions
+#ifdef DEBUG
 static void dbg_out_file(Pixel p, int size)
 {
 	int i = 0;
@@ -550,6 +553,7 @@ static void dbg_out_file(Pixel p, int size)
 		printf("B: %d\n", p[i].b);
 	}
 }
+#endif
 
 static Pixel newPixBuf(int n)
 {

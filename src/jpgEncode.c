@@ -18,12 +18,12 @@
 #define FALSE 0
 
 // DCT macros and constants
-#define A(x) (x == 0) ? sqrt(1/2) : 1)
-#define PI M_PI // pi constant as defined in math.h
+#define A(x) ((x == 0) ? sqrt(0.5) : 1 )
+#define PI 3.14159265358979323846 // c99 standard dropped M_PI
 
 #define DEBUG // debugging constant
 // #define DEBUG_PRE // debugging constant for the preprocessing code
-// #define DEBUG_BLOCKS // debugging constant for the code that creates 8x8 blocks
+#define DEBUG_BLOCKS // debugging constant for the code that creates 8x8 blocks
 #define DEBUG_DCT // debugging constant for the dct process
 
 /*  
@@ -53,8 +53,8 @@
 typedef struct _jpegData{
 	// YCbCr data
 	char *Y; // luminance (black and white comp)
-	char *Cb;
-	char *Cr;
+	char *Cb; // hue 
+	char *Cr; // color saturation of the image
 	
 	// 8 x 8 blocks storage of each channel (YCbCr)
 	char **YBlocks;
@@ -91,6 +91,9 @@ void levelShift(JpgData jDat); // subtract 128 from YCbCr channels to make DCT e
 */
 void dct(JpgData jDat); 
 
+// Quantization
+char **quantise(double **dct); // takes in one 8x8 DCT block and converts it to a quantised form
+
 /*
 	Input:
 	* bn = block number 0 < bn <= numBlocks
@@ -102,10 +105,7 @@ void dct(JpgData jDat);
 	Note: Don't forget to free() x and y
 
 */
-void blockToCoords(int bn, int *x, int *y);
-
-// Quantization
-// void quantise(char **dct, char **q);
+void blockToCoords(JpgData jDat, int bn, int *x, int *y);
 
 
 
@@ -400,9 +400,9 @@ void dct(JpgData jDat)
 	int *sX = NULL , *sY = NULL;
 
 	// DCT coefficient
-	double dctCYCoef = 0.0;
-	double dctCCbCoef = 0.0;
-	double dctCCrCoef = 0.0;
+	double dctYCoef = 0.0;
+	double dctCbCoef = 0.0;
+	double dctCrCoef = 0.0;
 
 	// create the dct 8x8 arrays
 	double **dctY = NULL;
@@ -431,36 +431,58 @@ void dct(JpgData jDat)
 	}
 
 	#ifdef DEBUG_DCT
-		printf(""
+		printf("numBlocks: %d\n", jDat->numBlocks);
+		printf("TW = %d and TH = %d\n", jDat->totalWidth, jDat->totalHeight);
 	#endif
 	// DCT main process:
-	for (curBlock = 1; curBlock <= jDat->numBlocks; curBlock++){
-		blockToCoords(curBlock, sX, sY);
+	for (curBlock = 1; curBlock <= jDat->numBlocks; curBlock++){ // apply it to every block in the image
+		sX = calloc(2, sizeof(int));
+		sY = calloc(2, sizeof(int));
+		blockToCoords(jDat, curBlock, sX, sY); // this function is seg faulting
 		startX = sX[0]; endX = sX[1]; // get the starting + ending x coordinates 
 		startY = sY[0]; endY = sY[1]; // get the starting + ending y coordinates
+		#ifdef DEBUG_DCT
+			printf("Block num: %d\n", curBlock);
+			printf("sX = %p and sY = %p\n", sX, sY);
+			printf("sX = %d, eX = %d\n", sX[0], sX[1]);
+			printf("sY = %d, eY = %d\n", sY[0], sY[1]);
+		#endif
 		for (u = 0; u < 8; u++){ // calculate DCT for G(u,v)
 			for (v = 0; v < 8; v++){
-				dctCYCoef = 0.0;
-				dctCCbCoef = 0.0;
-				dctCCrCoef = 0.0;
+				dctYCoef = 0.0;
+				dctCbCoef = 0.0;
+				dctCrCoef = 0.0;
 				for (i = startX; i < endX; i++){
 					for (j = startY; j < endY; j++){
-						dctCYCoef += jDat->YBlocks[j][i] * cos(((2 * (i % 8) + 1) * u * PI) / 16) * cos(((2 * (j % 8) + 1) * v * PI) / 16); // i, j can only take values from 0 <= i, j < 8
-						dctCCbCoef += jDat->CbBlocks[j][i] * cos(((2 * (i % 8) + 1) * u * PI) / 16) * cos(((2 * (j % 8) + 1) * v * PI) / 16);
-						dctCCrCoef += jDat->CrBlocks[j][i] * cos(((2 * (i % 8) + 1) * u * PI) / 16) * cos(((2 * (j % 8) + 1) * v * PI) / 16);
+						dctYCoef += jDat->YBlocks[j][i] * cos(((2 * (i % 8) + 1) * u * PI) / 16) * cos(((2 * (j % 8) + 1) * v * PI) / 16); // i, j can only take values from 0 <= i, j < 8
+						dctCbCoef += jDat->CbBlocks[j][i] * cos(((2 * (i % 8) + 1) * u * PI) / 16) * cos(((2 * (j % 8) + 1) * v * PI) / 16);
+						dctCrCoef += jDat->CrBlocks[j][i] * cos(((2 * (i % 8) + 1) * u * PI) / 16) * cos(((2 * (j % 8) + 1) * v * PI) / 16);
 					}
 				}
+
 				// finalise the dct coefficient
-				dctCYCoef = (1/4) * A(u) * A(v) * dctCYCoef;
-				dctCCbCoef = (1/4) * A(u) * A(v) * dctCCbCoef;
-				dctCCrCoef = (1/4) * A(u) * A(v) * dctCCrCoef;
+				dctYCoef = (0.25) * A(u) * A(v) * dctYCoef;
+				dctCbCoef = (0.25) * A(u) * A(v) * dctCbCoef;
+				dctCrCoef = (0.25) * A(u) * A(v) * dctCrCoef;
+
+				#ifdef DEBUG_DCT
+					printf("%4.2f ", dctYCoef);
+				#endif
 
 				// write the coefficient to the dct block
-				dctY[v][u] = dctCYCoef;
+				dctY[v][u] = dctYCoef;
 				dctCb[v][u] = dctCbCoef;
 				dctCr[v][u] = dctCrCoef;
 			}
+
+			#ifdef DEBUG_DCT
+				printf("\n");
+			#endif
 		}
+
+		#ifdef DEBUG_DCT
+			printf("\n\n");
+		#endif
 
 		// quantise the 8x8 block
 		
@@ -474,23 +496,21 @@ void dct(JpgData jDat)
 }
 
 // converts block number to starting and ending coordinates (x,y)
-void blockToCoords(int bn, int *x, int *y)
+void blockToCoords(JpgData jDat, int bn, int *x, int *y)
 {
-	unsigned int h = jDat->totalHeight;
+	// unsigned int h = jDat->totalHeight;
 	unsigned int w = jDat->totalWidth;
 	
-	unsigned int tw = w * (unsigned int) bn;
+	unsigned int tw = 8 * (unsigned int) bn;
 	
 	// don't forget to check that bn < numBlocks
-	x = calloc(2, sizeof(int));
-	y = calloc(2, sizeof(int));
 
 	// set the starting and ending y values
-	y[0] = tw / w;
-	y[1] = y[0] + 8;
-
+	y[0] = (int) (tw / w) * 8;
+	y[1] = y[0] + 8; // seg fault here
+	if (tw % w == 0) { y[0] -= 8; y[1] -= 8; } // reached the last block of a row
 	// set the starting and ending x values
-	x[0] = (tw % 32) - 8;
+	x[0] = (tw % w) - 8;
 	if (x[0] == -8) { x[0] = w - 8; } // in last column, maths doesn't make sense
 	x[1] = x[0] + 8;
 }

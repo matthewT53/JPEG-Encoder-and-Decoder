@@ -29,6 +29,8 @@
 // #define DEBUG_BLOCKS // debugging constant for the code that creates 8x8 blocks
 #define DEBUG_DCT // debugging constant for the dct process
 
+// #define LEVEL_SHIFT
+
 /*  
 	To clear confusion, just in case.
 	Width: X direction
@@ -138,6 +140,7 @@ static int determineFileSize(FILE *f); // determines the size of a file
 static void dbg_out_file(Pixel p, int size); // dumps the contents of buf into a file 
 #endif
 
+#ifdef QUAN_READY
 // default jpeg quantization matrix for 50% quality
 static int quanMatrix[QUAN_MAT_SIZE][QUAN_MAT_SIZE] = {	{16, 11, 10, 16, 24, 40, 51, 61},	
 														{12, 12, 14, 19, 26, 58, 60, 55}, 
@@ -148,7 +151,7 @@ static int quanMatrix[QUAN_MAT_SIZE][QUAN_MAT_SIZE] = {	{16, 11, 10, 16, 24, 40,
 														{49, 64, 78, 87, 103, 121, 120, 101},
 														{72, 92, 95, 98, 112, 100, 103, 99} };
 
-
+#endif
 // can easily be adapted to other image formats other than BMP - mainly used for testing
 Pixel imageToRGB(const char *imageName, int *bufSize)
 {
@@ -224,7 +227,9 @@ void preprocessJpg(JpgData jDat, Pixel rgb, unsigned int numPixels)
 {
 	convertRGBToYCbCr(jDat, rgb, numPixels); // change the colour space
 	form8by8blocks(jDat); // split the image into 8x8 blocks
-	//levelShift(jDat); // subtract 127 from each value
+	#ifdef LEVEL_SHIFT
+	levelShift(jDat); // subtract 127 from each value
+	#endif
 }
 
 void convertRGBToYCbCr(JpgData jDat, Pixel rgb, unsigned int numPixels)
@@ -389,7 +394,7 @@ void fillHeight(JpgData jDat, int nEdges)
 	}
 }
 
-/*
+#ifdef LEVEL_SHIFT
 // might not be required
 void levelShift(JpgData jDat)
 {
@@ -403,7 +408,8 @@ void levelShift(JpgData jDat)
 		}
 	}
 }
-*/
+
+#endif
 
 // applies dicrete cosine transformation to the image
 void dct(JpgData jDat)
@@ -472,7 +478,7 @@ void dct(JpgData jDat)
 				dctCrCoef = 0.0;
 				for (i = startX; i < endX; i++){
 					for (j = startY; j < endY; j++){
-						dctYCoef += jDat->YBlocks[j][i] * cos(((2 * (i % 8) + 1) * u * PI) / 16) * cos(((2 * (j % 8) + 1) * v * PI) / 16); // i, j can only take values from 0 <= i, j < 8
+						dctYCoef += jDat->YBlocks[j][i] * cos(((2 * (i % 8) + 1) * u * PI) / 16) * cos(((2 * (j % 8) + 1) * v * PI) / 16); // i, j can only take values from 0 <= i,j < 8
 						dctCbCoef += jDat->CbBlocks[j][i] * cos(((2 * (i % 8) + 1) * u * PI) / 16) * cos(((2 * (j % 8) + 1) * v * PI) / 16);
 						dctCrCoef += jDat->CrBlocks[j][i] * cos(((2 * (i % 8) + 1) * u * PI) / 16) * cos(((2 * (j % 8) + 1) * v * PI) / 16);
 					}

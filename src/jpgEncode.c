@@ -23,6 +23,7 @@
 
 // quan matrix constants
 #define QUAN_MAT_SIZE 8
+#define DEFAULT_QUALITY 50
 
 // #define DEBUG // debugging constant
 // #define DEBUG_PRE // debugging constant for the preprocessing code
@@ -30,6 +31,7 @@
 #define DEBUG_DCT // debugging constant for the dct process
 
 // #define LEVEL_SHIFT
+// #define QUAN_READY
 
 /*  
 	To clear confusion, just in case.
@@ -40,6 +42,7 @@
 	Sources that assisted me:
 	* https://en.wikipedia.org/wiki/JPEG
 	* http://www.dfrws.org/2008/proceedings/p21-kornblum_pres.pdf -> Quantization quality scaling
+	* http://www.dmi.unict.it/~battiato/EI_MOBILE0708/JPEG%20%28Bruna%29.pdf
 
 	Algorithm:
 	1 < Q < 100 ( quality range );
@@ -51,7 +54,7 @@
 	* the higher q is, the larger the file size
 
 	Things to do:
-	* add down sampling (might need to)
+	* add down sampling (might need to), current setting is 4:4:4
 	* add support for quality scaling (user specifies a quality)
 	
 */
@@ -59,7 +62,7 @@
 typedef struct _jpegData{
 	// YCbCr data
 	char *Y; // luminance (black and white comp)
-	char *Cb; // hue 
+	char *Cb; // hue: Cb and Cr represent the chrominance
 	char *Cr; // color saturation of the image
 	
 	// 8 x 8 blocks storage of each channel (YCbCr)
@@ -68,9 +71,9 @@ typedef struct _jpegData{
 	char **CrBlocks;
 	
 	// DCT / Quantization step
-	char **quanY;
-	char **quanCb;
-	char **quanCr;
+	int **quanY;
+	int **quanCb;
+	int **quanCr;
 	int quality; // 1 < q < 100, default = 50
 	int numBlocks; // counts the number of 8x8 blocks in the image
 	
@@ -99,7 +102,16 @@ void levelShift(JpgData jDat); // subtract 128 from YCbCr channels to make DCT e
 void dct(JpgData jDat); 
 
 // Quantization
-char **quantise(double **dct); // takes in one 8x8 DCT block and converts it to a quantised form
+/*
+	Input: 
+	* an 8x8 size matrix with DC and AC DCT coefs
+	* jDat = JpgData structure contain the properties for the jpeg image
+	* sx = startX for the quan matrices in the jDat
+	* sy = same as for sx except in the y direction
+	Output: void
+	Usage: Modified the jDat quan matrices
+*/
+void quantise(JpgData jDat, double **dctY, double **dctCb, double **dctCr, int sx, int sy); // takes in one 8x8 DCT block and converts it to a quantised form
 
 /*
 	Input:
@@ -141,17 +153,28 @@ static void dbg_out_file(Pixel p, int size); // dumps the contents of buf into a
 #endif
 
 #ifdef QUAN_READY
-// default jpeg quantization matrix for 50% quality
-static int quanMatrix[QUAN_MAT_SIZE][QUAN_MAT_SIZE] = {	{16, 11, 10, 16, 24, 40, 51, 61},	
-														{12, 12, 14, 19, 26, 58, 60, 55}, 
-														{14, 13, 16, 24, 40, 57, 69, 56}, 
-														{14, 17, 22, 29, 51, 87, 80, 62},
-														{18, 22, 37, 56, 68, 109, 103, 77}, 
-														{24, 35, 55, 64, 81, 104, 113, 92}, 
-														{49, 64, 78, 87, 103, 121, 120, 101},
-														{72, 92, 95, 98, 112, 100, 103, 99} };
+// default jpeg quantization matrix for 50% quality (luminance)
+static int quanMatrixLum[QUAN_MAT_SIZE][QUAN_MAT_SIZE] = {{16, 11, 10, 16, 24, 40, 51, 61},	
+														 {12, 12, 14, 19, 26, 58, 60, 55}, 
+														 {14, 13, 16, 24, 40, 57, 69, 56}, 
+														 {14, 17, 22, 29, 51, 87, 80, 62},
+														 {18, 22, 37, 56, 68, 109, 103, 77}, 
+														 {24, 35, 55, 64, 81, 104, 113, 92}, 
+														 {49, 64, 78, 87, 103, 121, 120, 101},
+														 {72, 92, 95, 98, 112, 100, 103, 99}};
+
+// quan matrix for chrominance
+static int quanMatrixChr[QUAN_MAT_SIZE][QUAN_MAT_SIZE] = {{17, 18, 24, 47, 99, 99, 99, 99},
+														  {18, 21, 26, 66, 99, 99, 99, 99},
+														  {24, 26, 56, 99, 99, 99, 99, 99},
+														  {47, 66, 99, 99, 99, 99, 99, 99},
+														  {99, 99, 99, 99, 99, 99, 99, 99}, 
+														  {99, 99, 99, 99, 99, 99, 99, 99},
+														  {99, 99, 99, 99, 99, 99, 99, 99},
+														  {99, 99, 99, 99, 99, 99, 99, 99}};	
 
 #endif
+
 // can easily be adapted to other image formats other than BMP - mainly used for testing
 Pixel imageToRGB(const char *imageName, int *bufSize)
 {
@@ -196,12 +219,13 @@ Pixel imageToRGB(const char *imageName, int *bufSize)
 }
 
 // main encoding process
-void encodeRGBToJpgDisk(const char *jpgFile, Pixel rgbBuffer, unsigned int numPixels, unsigned int width, unsigned int height)
+void encodeRGBToJpgDisk(const char *jpgFile, Pixel rgbBuffer, unsigned int numPixels, unsigned int width, unsigned int height, int quality)
 {
 	JpgData jD = malloc(sizeof(jpegData)); // create object to hold info about the jpeg
 
 	jD->width = width;
 	jD->height = height;
+	jD->quality = quality;
 	
 	if (jD != NULL){
 		preprocessJpg(jD, rgbBuffer, numPixels); // preprocess the image data
@@ -444,14 +468,14 @@ void dct(JpgData jDat)
 	}
 
 	// create the quantization arrays
-	jDat->quanY = malloc(sizeof(char *) * jDat->totalHeight);
-	jDat->quanCb = malloc(sizeof(char *) * jDat->totalHeight);
-	jDat->quanCr = malloc(sizeof(char *) * jDat->totalHeight);
+	jDat->quanY = malloc(sizeof(int *) * jDat->totalHeight);
+	jDat->quanCb = malloc(sizeof(int *) * jDat->totalHeight);
+	jDat->quanCr = malloc(sizeof(int *) * jDat->totalHeight);
 
 	for (i = 0; i < jDat->totalHeight; i++){
-		jDat->quanY[i] = calloc(jDat->totalWidth, sizeof(char));
-		jDat->quanCb[i] = calloc(jDat->totalWidth, sizeof(char));
-		jDat->quanCr[i] = calloc(jDat->totalWidth, sizeof(char));
+		jDat->quanY[i] = calloc(jDat->totalWidth, sizeof(int));
+		jDat->quanCb[i] = calloc(jDat->totalWidth, sizeof(int));
+		jDat->quanCr[i] = calloc(jDat->totalWidth, sizeof(int));
 	}
 
 	#ifdef DEBUG_DCT
@@ -490,7 +514,7 @@ void dct(JpgData jDat)
 				dctCrCoef = (0.25) * A(u) * A(v) * dctCrCoef;
 
 				#ifdef DEBUG_DCT
-					printf("%6.2f ", dctYCoef);
+					printf("%8.2f ", dctYCoef);
 				#endif
 
 				// write the coefficient to the dct block
@@ -509,7 +533,6 @@ void dct(JpgData jDat)
 		#endif
 
 		// quantise the 8x8 block
-		
 
 		// free the coordinates array
 		free(sX);
@@ -517,6 +540,40 @@ void dct(JpgData jDat)
 		sX = NULL;
 		sY= NULL;
 	}	
+}
+
+// quantises the image
+void quantise(JpgData jDat, double **dctY, double **dctCb, double **dctCr, int sx, int sy)
+{
+	int q = jDat->quality;
+	int s = 0;
+	int i = 0, j = 0, m = 0, n = 0;
+	int qMatY[QUAN_MAT_SIZE][QUAN_MAT_SIZE] = {0};
+	int qMatCbCr[QUAN_MAT_SIZE][QUAN_MAT_SIZE] = {0};
+
+	// check if quality has the correct value
+	if (q < 1 || q > 100){
+		q = jDat->quality = DEFAULT_QUALITY; // default quality = 50
+	}
+	
+	s = ((q < DEFAULT_QUALITY) ? (5000 / q) : 200 - (2*q)); // get the quality scaling factor
+	
+	// change the quan matrix based on the scaling factor
+	for (i = 0; i < 8; i++){
+		for (j = 0; j < 8; j++){
+			qMatY[i][j] = ((s*quanMatrixLum[i][j] + 50) / 100);
+			qMatCbCr[i][j] = ((s*quanMatrixChr[i][j] + 50) / 100);
+		}
+	}
+	
+	// quantise the matrices
+	for (i = 0, m = sy; i < 8; i++, m++){
+		for (j = 0, n = sx; j < 8; j++, n++){
+			jDat->quanY[m][n] = (int) round(dctY[i][j] / qMatY[i][j]);
+			jDat->quanCb[m][n] = (int) round(dctCb[i][j] / qMatCbCr[i][j]);
+			jDat->quanCr[m][n] = (int) round(dctCr[i][j] / qMatCbCr[i][j]);
+		}
+	}
 }
 
 // converts block number to starting and ending coordinates (x,y)

@@ -22,6 +22,7 @@
 #define PI 3.14159265358979323846 // c99 standard dropped M_PI
 
 // quan matrix constants
+#define BLOCK_SIZE 8
 #define QUAN_MAT_SIZE 8
 #define DEFAULT_QUALITY 50
 
@@ -29,9 +30,11 @@
 // #define DEBUG_PRE // debugging constant for the preprocessing code
 // #define DEBUG_BLOCKS // debugging constant for the code that creates 8x8 blocks
 #define DEBUG_DCT // debugging constant for the dct process
+#define DEBUG_QUAN // debugging constant for the quan process
 
 // #define LEVEL_SHIFT
-// #define QUAN_READY
+#define QUAN_READY
+
 
 /*  
 	To clear confusion, just in case.
@@ -457,14 +460,14 @@ void dct(JpgData jDat)
 	double **dctCb = NULL;
 	double **dctCr = NULL;
 
-	dctY = malloc(sizeof(double *) * jDat->totalHeight);
-	dctCb = malloc(sizeof(double *) * jDat->totalHeight);
-	dctCr = malloc(sizeof(double *) * jDat->totalHeight);
+	dctY = malloc(sizeof(double *) * BLOCK_SIZE);
+	dctCb = malloc(sizeof(double *) * BLOCK_SIZE);
+	dctCr = malloc(sizeof(double *) * BLOCK_SIZE);
 
-	for (i = 0; i < jDat->totalHeight; i++){
-		dctY[i] = calloc(jDat->totalWidth, sizeof(double));
-		dctCb[i] = calloc(jDat->totalWidth, sizeof(double));
-		dctCr[i] = calloc(jDat->totalWidth, sizeof(double));
+	for (i = 0; i < BLOCK_SIZE; i++){
+		dctY[i] = calloc(BLOCK_SIZE, sizeof(double));
+		dctCb[i] = calloc(BLOCK_SIZE, sizeof(double));
+		dctCr[i] = calloc(BLOCK_SIZE, sizeof(double));
 	}
 
 	// create the quantization arrays
@@ -513,37 +516,47 @@ void dct(JpgData jDat)
 				dctCbCoef = (0.25) * A(u) * A(v) * dctCbCoef;
 				dctCrCoef = (0.25) * A(u) * A(v) * dctCrCoef;
 
-				#ifdef DEBUG_DCT
-					printf("%8.2f ", dctYCoef);
-				#endif
-
 				// write the coefficient to the dct block
 				dctY[v][u] = dctYCoef;
 				dctCb[v][u] = dctCbCoef;
 				dctCr[v][u] = dctCrCoef;
 			}
-
-			#ifdef DEBUG_DCT
-				printf("\n");
-			#endif
 		}
 
 		#ifdef DEBUG_DCT
-			printf("\n\n");
+			// print the DCT matrix
+			for (i = 0; i < 8; i++){
+				for (j = 0; j < 8; j++){
+					printf("%8.2f ", dctY[i][j]);
+				}
+				printf("\n");
+			}
+
 		#endif
 
 		// quantise the 8x8 block
-
+		quantise(jDat, dctY, dctCb, dctCr, startX, startY);
 		// free the coordinates array
 		free(sX);
 		free(sY);
 		sX = NULL;
 		sY= NULL;
 	}	
+
+	// free resources
+	for (i = 0; i < BLOCK_SIZE; i++){
+		free(dctY[i]);
+		free(dctCb[i]);
+		free(dctCr[i]);
+	}
+
+	free(dctY);
+	free(dctCb);
+	free(dctCr);
 }
 
 // quantises the image
-void quantise(JpgData jDat, double **dctY, double **dctCb, double **dctCr, int sx, int sy)
+void quantise(JpgData jDat, double **dctY, double **dctCb, double **dctCr, int sx, int sy) // may have ot modify for down sampling
 {
 	int q = jDat->quality;
 	int s = 0;
@@ -555,8 +568,8 @@ void quantise(JpgData jDat, double **dctY, double **dctCb, double **dctCr, int s
 	if (q < 1 || q > 100){
 		q = jDat->quality = DEFAULT_QUALITY; // default quality = 50
 	}
-	
-	s = ((q < DEFAULT_QUALITY) ? (5000 / q) : 200 - (2*q)); // get the quality scaling factor
+	// printf("Quality: %d\n", q);
+	s = ((q < DEFAULT_QUALITY) ? (5000 / q) : (200 - (2*q))); // get the quality scaling factor
 	
 	// change the quan matrix based on the scaling factor
 	for (i = 0; i < 8; i++){
@@ -572,8 +585,18 @@ void quantise(JpgData jDat, double **dctY, double **dctCb, double **dctCr, int s
 			jDat->quanY[m][n] = (int) round(dctY[i][j] / qMatY[i][j]);
 			jDat->quanCb[m][n] = (int) round(dctCb[i][j] / qMatCbCr[i][j]);
 			jDat->quanCr[m][n] = (int) round(dctCr[i][j] / qMatCbCr[i][j]);
+			#ifdef DEBUG_QUAN
+				printf("%4d ", jDat->quanY[m][n]);
+			#endif
 		}
-	}
+		#ifdef DEBUG_QUAN
+			printf("\n");
+		#endif
+	}	
+
+	#ifdef DEBUG_QUAN
+		printf("\n\n");
+	#endif
 }
 
 // converts block number to starting and ending coordinates (x,y)

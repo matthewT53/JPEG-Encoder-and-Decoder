@@ -531,7 +531,7 @@ void dct(JpgData jDat)
 				}
 				printf("\n");
 			}
-
+			printf("\n");
 		#endif
 
 		// quantise the 8x8 block
@@ -634,11 +634,17 @@ void disposeJpgData(JpgData jdata)
 		free(jdata->YBlocks[i]);
 		free(jdata->CbBlocks[i]);
 		free(jdata->CrBlocks[i]);
+		free(jdata->quanY[i]);
+		free(jdata->quanCb[i]);
+		free(jdata->quanCr[i]);
 	}
 	
 	free(jdata->YBlocks);
 	free(jdata->CbBlocks);
 	free(jdata->CrBlocks);
+	free(jdata->quanY);
+	free(jdata->quanCb);
+	free(jdata->quanCr);
 	// free the whole struct
 	free(jdata);
 }

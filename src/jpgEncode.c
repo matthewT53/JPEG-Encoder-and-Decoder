@@ -46,6 +46,8 @@
 	* https://en.wikipedia.org/wiki/JPEG
 	* http://www.dfrws.org/2008/proceedings/p21-kornblum_pres.pdf -> Quantization quality scaling
 	* http://www.dmi.unict.it/~battiato/EI_MOBILE0708/JPEG%20%28Bruna%29.pdf
+	* http://www.pcs-ip.eu/index.php/main/edu/7 -> zig-zag ordering + entropy encoding 
+	* http://www.impulseadventure.com/photo/jpeg-huffman-coding.html -> Huffman encoding
 
 	Algorithm:
 	1 < Q < 100 ( quality range );
@@ -111,10 +113,21 @@ void dct(JpgData jDat);
 	* jDat = JpgData structure contain the properties for the jpeg image
 	* sx = startX for the quan matrices in the jDat
 	* sy = same as for sx except in the y direction
-	Output: void
-	Usage: Modified the jDat quan matrices
+	
+	Output: Modified the jDat quan matrices
 */
 void quantise(JpgData jDat, double **dctY, double **dctCb, double **dctCr, int sx, int sy); // takes in one 8x8 DCT block and converts it to a quantised form
+
+/*
+	Re-orders the coefficients in the quantized tables of Y,Cb and Cr in a zag-zag fashion.
+	Input: 
+	* jDat containing quantised blocks
+
+	Output:
+	* adds to the JpgData struct the zig-zag ordering of coeffcients from each quan block
+*/
+
+void zigZag(JpgData jDat);
 
 /*
 	Input:
@@ -568,7 +581,7 @@ void quantise(JpgData jDat, double **dctY, double **dctCb, double **dctCr, int s
 	if (q < 1 || q > 100){
 		q = jDat->quality = DEFAULT_QUALITY; // default quality = 50
 	}
-	// printf("Quality: %d\n", q);
+
 	s = ((q < DEFAULT_QUALITY) ? (5000 / q) : (200 - (2*q))); // get the quality scaling factor
 	
 	// change the quan matrix based on the scaling factor

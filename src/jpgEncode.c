@@ -2,7 +2,7 @@
 	Name: Matthew Ta
 	Date Created: 29/12/2015
 	Date mod: 29/12/2015
-	Description: Jpeg encoder
+	Description: Jpeg encoder based on the JFIF standard
 */
 
 #include <stdio.h>
@@ -47,6 +47,7 @@
 	* https://www.cs.auckland.ac.nz/courses/compsci708s1c/lectures/jpeg_mpeg/jpeg.html
 	* http://www.dfrws.org/2008/proceedings/p21-kornblum_pres.pdf -> Quantization quality scaling
 	* http://www.dmi.unict.it/~battiato/EI_MOBILE0708/JPEG%20%28Bruna%29.pdf
+	* http://cnx.org/contents/eMc9DKWD@5/JPEG-Entropy-Coding -> Zig-zag: "Borrowed the order matrix"
 	* http://www.pcs-ip.eu/index.php/main/edu/7 -> zig-zag ordering + entropy encoding 
 	* http://www.impulseadventure.com/photo/jpeg-huffman-coding.html -> Huffman encoding
 
@@ -119,6 +120,7 @@ void dct(JpgData jDat);
 */
 void quantise(JpgData jDat, double **dctY, double **dctCb, double **dctCr, int sx, int sy); // takes in one 8x8 DCT block and converts it to a quantised form
 
+// Zig-Zag ordering
 /*
 	Re-orders the coefficients in the quantized tables of Y,Cb and Cr in a zag-zag fashion.
 	Input: 
@@ -127,7 +129,6 @@ void quantise(JpgData jDat, double **dctY, double **dctCb, double **dctCr, int s
 	Output:
 	* adds to the JpgData struct the zig-zag ordering of coeffcients from each quan block
 */
-
 void zigZag(JpgData jDat);
 
 /*
@@ -171,7 +172,7 @@ static void dbg_out_file(Pixel p, int size); // dumps the contents of buf into a
 
 #ifdef QUAN_READY
 // default jpeg quantization matrix for 50% quality (luminance)
-static int quanMatrixLum[QUAN_MAT_SIZE][QUAN_MAT_SIZE] = {{16, 11, 10, 16, 24, 40, 51, 61},	
+static const int quanMatrixLum[QUAN_MAT_SIZE][QUAN_MAT_SIZE] = {{16, 11, 10, 16, 24, 40, 51, 61},	
 														 {12, 12, 14, 19, 26, 58, 60, 55}, 
 														 {14, 13, 16, 24, 40, 57, 69, 56}, 
 														 {14, 17, 22, 29, 51, 87, 80, 62},
@@ -181,7 +182,7 @@ static int quanMatrixLum[QUAN_MAT_SIZE][QUAN_MAT_SIZE] = {{16, 11, 10, 16, 24, 4
 														 {72, 92, 95, 98, 112, 100, 103, 99}};
 
 // quan matrix for chrominance
-static int quanMatrixChr[QUAN_MAT_SIZE][QUAN_MAT_SIZE] = {{17, 18, 24, 47, 99, 99, 99, 99},
+static const int quanMatrixChr[QUAN_MAT_SIZE][QUAN_MAT_SIZE] = {{17, 18, 24, 47, 99, 99, 99, 99},
 														  {18, 21, 26, 66, 99, 99, 99, 99},
 														  {24, 26, 56, 99, 99, 99, 99, 99},
 														  {47, 66, 99, 99, 99, 99, 99, 99},
@@ -251,6 +252,7 @@ void encodeRGBToJpgDisk(const char *jpgFile, Pixel rgbBuffer, unsigned int numPi
 		dct(jD);
 
 		// entropy coding
+		zigZag(jD);
 
 		// Huffman coding
 
@@ -499,7 +501,7 @@ void dct(JpgData jDat)
 		printf("numBlocks: %d\n", jDat->numBlocks);
 		printf("TW = %d and TH = %d\n", jDat->totalWidth, jDat->totalHeight);
 	#endif
-	// DCT main process:
+	// DCT main process: O(n^4) for each 8x8 block
 	for (curBlock = 1; curBlock <= jDat->numBlocks; curBlock++){ // apply it to every block in the image
 		sX = calloc(2, sizeof(int));
 		sY = calloc(2, sizeof(int));
@@ -512,8 +514,8 @@ void dct(JpgData jDat)
 			printf("sX = %d, eX = %d\n", sX[0], sX[1]);
 			printf("sY = %d, eY = %d\n", sY[0], sY[1]);
 		#endif
-		for (u = 0; u < 8; u++){ // calculate DCT for G(u,v)
-			for (v = 0; v < 8; v++){
+		for (u = 0; u < BLOCK_SIZE; u++){ // calculate DCT for G(u,v)
+			for (v = 0; v < BLOCK_SIZE; v++){
 				dctYCoef = 0.0;
 				dctCbCoef = 0.0;
 				dctCrCoef = 0.0;
@@ -586,16 +588,16 @@ void quantise(JpgData jDat, double **dctY, double **dctCb, double **dctCr, int s
 	s = ((q < DEFAULT_QUALITY) ? (5000 / q) : (200 - (2*q))); // get the quality scaling factor
 	
 	// change the quan matrix based on the scaling factor
-	for (i = 0; i < 8; i++){
-		for (j = 0; j < 8; j++){
+	for (i = 0; i < BLOCK_SIZE; i++){
+		for (j = 0; j < BLOCK_SIZE; j++){
 			qMatY[i][j] = ((s*quanMatrixLum[i][j] + 50) / 100);
 			qMatCbCr[i][j] = ((s*quanMatrixChr[i][j] + 50) / 100);
 		}
 	}
 	
 	// quantise the matrices
-	for (i = 0, m = sy; i < 8; i++, m++){
-		for (j = 0, n = sx; j < 8; j++, n++){
+	for (i = 0, m = sy; i < BLOCK_SIZE; i++, m++){
+		for (j = 0, n = sx; j < BLOCK_SIZE; j++, n++){
 			jDat->quanY[m][n] = (int) round(dctY[i][j] / qMatY[i][j]);
 			jDat->quanCb[m][n] = (int) round(dctCb[i][j] / qMatCbCr[i][j]);
 			jDat->quanCr[m][n] = (int) round(dctCr[i][j] / qMatCbCr[i][j]);
@@ -616,8 +618,22 @@ void quantise(JpgData jDat, double **dctY, double **dctCb, double **dctCr, int s
 // re-orders the coefficients of the quantized matrices
 void zigZag(JpgData jDat)
 {
+	// read the quan coefficients
+	printf("Not yet implemented.\n");
+	int i = 0, j = 0;
+	const char zzOrder[BLOCK_SIZE][BLOCK_SIZE] = {{0, 1, 5, 6, 14, 15, 27, 28},  // Order in which to read the quan coefficients
+												  {2, 4, 7, 13, 16, 26, 29, 42}, 
+										          {3, 8, 12, 17, 25, 30, 41, 43}, 
+												  {9, 11, 18, 24, 31, 40, 44, 53}, 
+						    					  {10, 19, 23, 32, 39, 45, 52, 54},
+											      {20, 22, 33, 38, 46, 51, 55, 60},
+												  {21, 34, 37, 47, 50, 56, 69, 61},
+												  {35, 36, 48, 49, 57, 58, 62, 63}};
+
 	
 
+	// store the zig-zag ordered quan coefficients
+	
 
 
 }

@@ -44,6 +44,7 @@
 
 	Sources that assisted me:
 	* https://en.wikipedia.org/wiki/JPEG
+	* https://www.cs.auckland.ac.nz/courses/compsci708s1c/lectures/jpeg_mpeg/jpeg.html
 	* http://www.dfrws.org/2008/proceedings/p21-kornblum_pres.pdf -> Quantization quality scaling
 	* http://www.dmi.unict.it/~battiato/EI_MOBILE0708/JPEG%20%28Bruna%29.pdf
 	* http://www.pcs-ip.eu/index.php/main/edu/7 -> zig-zag ordering + entropy encoding 
@@ -610,6 +611,15 @@ void quantise(JpgData jDat, double **dctY, double **dctCb, double **dctCr, int s
 	#ifdef DEBUG_QUAN
 		printf("\n\n");
 	#endif
+}
+
+// re-orders the coefficients of the quantized matrices
+void zigZag(JpgData jDat)
+{
+	
+
+
+
 }
 
 // converts block number to starting and ending coordinates (x,y)

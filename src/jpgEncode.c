@@ -26,11 +26,15 @@
 #define QUAN_MAT_SIZE 8
 #define DEFAULT_QUALITY 50
 
+// zig-zag stuff
+#define NUM_COEFFICIENTS 64
+
 // #define DEBUG // debugging constant
 // #define DEBUG_PRE // debugging constant for the preprocessing code
 // #define DEBUG_BLOCKS // debugging constant for the code that creates 8x8 blocks
 #define DEBUG_DCT // debugging constant for the dct process
 #define DEBUG_QUAN // debugging constant for the quan process
+#define DEBUG_ZZ // debugging constant for zig-zag process
 
 // #define LEVEL_SHIFT
 #define QUAN_READY
@@ -83,6 +87,11 @@ typedef struct _jpegData{
 	int **quanCr;
 	int quality; // 1 < q < 100, default = 50
 	int numBlocks; // counts the number of 8x8 blocks in the image
+
+	// zig-zag ordering stuff
+	int **zzY; // rows = # blocks, cols = # coefficients which is 64
+	int **zzCb;
+	int **zzCr;
 	
 	// common image properties
 	unsigned int width;
@@ -92,6 +101,12 @@ typedef struct _jpegData{
 	unsigned int totalWidth;
 	unsigned int totalHeight;
 } jpegData;
+
+// Coordinate structure used to predefine the order in which to process the quan coefficients in zig-zag()
+typedef struct _coordinate{
+	char x; // use char instead of int since we dont need huge storage
+	char y;
+} Coordinate;
 
 /* ===================== JPEG ENCODING FUNCTIONS ===================*/
 // JPEG PREPROCESSING FUNCTION PROTOTYPES
@@ -143,6 +158,7 @@ void zigZag(JpgData jDat);
 
 */
 void blockToCoords(JpgData jDat, int bn, int *x, int *y);
+void loadCoordinates(Coordinate *c); // loads co-ordinates that indicate the order in which the quan coefficients should be analysed
 
 
 
@@ -246,7 +262,8 @@ void encodeRGBToJpgDisk(const char *jpgFile, Pixel rgbBuffer, unsigned int numPi
 	jD->quality = quality;
 	
 	if (jD != NULL){
-		preprocessJpg(jD, rgbBuffer, numPixels); // preprocess the image data
+		// preprocess the image data
+		preprocessJpg(jD, rgbBuffer, numPixels);
 
 		// DCT	
 		dct(jD);
@@ -619,23 +636,76 @@ void quantise(JpgData jDat, double **dctY, double **dctCb, double **dctCr, int s
 void zigZag(JpgData jDat)
 {
 	// read the quan coefficients
-	printf("Not yet implemented.\n");
+	// printf("Not yet implemented.\n");
 	int i = 0, j = 0;
+	int *sX = NULL, *sY = NULL;
+	int startX = 0, startY = 0;
+	int cX = 0, cY = 0;
+
+	/*
 	const char zzOrder[BLOCK_SIZE][BLOCK_SIZE] = {{0, 1, 5, 6, 14, 15, 27, 28},  // Order in which to read the quan coefficients
 												  {2, 4, 7, 13, 16, 26, 29, 42}, 
 										          {3, 8, 12, 17, 25, 30, 41, 43}, 
 												  {9, 11, 18, 24, 31, 40, 44, 53}, 
 						    					  {10, 19, 23, 32, 39, 45, 52, 54},
 											      {20, 22, 33, 38, 46, 51, 55, 60},
-												  {21, 34, 37, 47, 50, 56, 69, 61},
+												  {21, 34, 37, 47, 50, 56, 59, 61},
 												  {35, 36, 48, 49, 57, 58, 62, 63}};
+	*/
 
+	Coordinate *c = malloc(sizeof(Coordinate) * NUM_COEFFICIENTS);
+
+	// get space to hold the starting coordinates for each block
+	sX = malloc(sizeof(int) * 2);
+	sY = malloc(sizeof(int) * 2);
+
+	jDat->zzY = malloc(sizeof(int *) * jDat->numBlocks);
+	jDat->zzCb = malloc(sizeof(int *) * jDat->numBlocks);
+	jDat->zzCr = malloc(sizeof(int *) * jDat->numBlocks);
+
+	for (i = 0; i < jDat->numBlocks; i++){
+		jDat->zzY[i] = calloc(NUM_COEFFICIENTS, sizeof(int));
+		jDat->zzCb[i] = calloc(NUM_COEFFICIENTS, sizeof(int));
+		jDat->zzCr[i] = calloc(NUM_COEFFICIENTS, sizeof(int));
+	} 
+
+	assert(sX != NULL && sY != NULL && c != NULL);
 	
-
+	/*
+	// very expensive algorithm
 	// store the zig-zag ordered quan coefficients
-	
+	for (curBlock = 1; curBlock <= jDat->numBlocks; curBlock++){ // process each block
+		blockToCoords(jDat, curBlock, sX, sY);
+		for (pos = 0; pos < NUM_COEFFICIENTS; pos++){ // fairly expensive process, can be made more efficient
+			foundPos = FALSE;
+			for (i = 0; i < BLOCK_SIZE && !foundPos; i++){
+				for (j = 0; j < BLOCK_SIZE; j++){
+					if (zzOrder[i][j] == pos) { foundPos = TRUE; break; }
+				}
+			}
+		}
+	}
 
+	*/
 
+	loadCoordinates(c);
+	// process earch block from the quantized matrices
+	for (curBlock = 1; curBlock <= jDat->numBlocks; curBlock++){
+		blockToCoords(jDat, curBlock, sX, sY);
+		startX = sX[0];
+		startY = sY[0];
+		for (j = 0; j < NUM_COEFFICIENTS; j++){
+			cX = c[j].x;
+			cY = c[j].y;
+			jDat->zzY[curBlock][j] = jDat->quanY[startY+ cY][startX + cX];
+			jDat->zzCb[curBlock][j] = jDat->quanCb[startY + cY][startX + cX];
+			jDat->zzCr[curBlock][j] = jDat->quanCr[startY + cY][startX + cX];	
+		}
+	}
+
+	free(c);
+	free(sX);
+	free(sY);
 }
 
 // converts block number to starting and ending coordinates (x,y)
@@ -650,12 +720,81 @@ void blockToCoords(JpgData jDat, int bn, int *x, int *y)
 
 	// set the starting and ending y values
 	y[0] = (int) (tw / w) * 8;
-	y[1] = y[0] + 8; // seg fault here
+	y[1] = y[0] + 8;
 	if (tw % w == 0) { y[0] -= 8; y[1] -= 8; } // reached the last block of a row
 	// set the starting and ending x values
 	x[0] = (tw % w) - 8;
 	if (x[0] == -8) { x[0] = w - 8; } // in last column, maths doesn't make sense
 	x[1] = x[0] + 8;
+}
+
+void loadCoordinates(Coordinate *c)
+{
+	// Ok to hard code since we will always process 8x8 blocks
+	c[0].x = 0; c[0].y = 0;
+	c[1].x = 1; c[1].y = 0;
+	c[2].x = 0; c[2].y = 1;
+	c[3].x = 0; c[3].y = 2;
+	c[4].x = 1; c[4].y = 1;
+	c[5].x = 2; c[5].y = 0;
+	c[6].x = 3; c[6].y = 0;
+	c[7].x = 2; c[7].y = 1;
+	c[8].x = 1; c[8].y = 2;
+	c[9].x = 0; c[9].y = 3;
+	c[10].x = 0; c[10].y = 4;
+	c[11].x = 1; c[11].y = 3;
+	c[12].x = 2; c[12].y = 2;
+	c[13].x = 3; c[13].y = 1;
+	c[14].x = 4; c[14].y = 0;
+	c[15].x = 5; c[15].y = 0;
+	c[16].x = 4; c[16].y = 1;
+	c[17].x = 3; c[17].y = 2;
+	c[18].x = 2; c[18].y = 3;
+	c[19].x = 1; c[19].y = 4;
+	c[20].x = 0; c[20].y = 5;
+	c[21].x = 0; c[21].y = 6;
+	c[22].x = 1; c[22].y = 5;
+	c[23].x = 2; c[23].y = 4;
+	c[24].x = 3; c[24].y = 3;
+	c[25].x = 4; c[25].y = 2;
+	c[26].x = 5; c[26].y = 1;
+	c[27].x = 6; c[27].y = 0;
+	c[28].x = 7; c[28].y = 0;
+	c[29].x = 6; c[29].y = 1;
+	c[30].x = 5; c[30].y = 2;
+	c[31].x = 4; c[31].y = 3;
+	c[32].x = 3; c[32].y = 4;
+	c[33].x = 2; c[33].y = 5;
+	c[34].x = 1; c[34].y = 6;
+	c[35].x = 0; c[35].y = 7;
+	c[36].x = 1; c[36].y = 7;
+	c[37].x = 2; c[37].y = 6;
+	c[38].x = 3; c[38].y = 5;
+	c[39].x = 4; c[39].y = 4;
+	c[40].x = 5; c[40].y = 3;
+	c[41].x = 6; c[41].y = 2;
+	c[42].x = 7; c[42].y = 1;
+	c[43].x = 7; c[43].y = 2;
+	c[44].x = 6; c[44].y = 3;
+	c[45].x = 5; c[45].y = 4;
+	c[46].x = 4; c[46].y = 5;
+	c[47].x = 3; c[47].y = 6;
+	c[48].x = 2; c[48].y = 7;
+	c[49].x = 3; c[49].y = 7;
+	c[50].x = 4; c[50].y = 6;
+	c[51].x = 5; c[51].y = 5;
+	c[52].x = 6; c[52].y = 4;
+	c[53].x = 7; c[53].y = 3;
+	c[54].x = 7; c[54].y = 4;
+	c[55].x = 6; c[55].y = 5;
+	c[56].x = 5; c[56].y = 6;
+	c[57].x = 4; c[57].y = 7;
+	c[58].x = 5; c[58].y = 7;
+	c[59].x = 6; c[59].y = 6;
+	c[60].x = 7; c[60].y = 5;
+	c[61].x = 7; c[61].y = 6;
+	c[62].x = 6; c[62].y = 7;
+	c[63].x = 7; c[63].y = 7;
 }
 
 
@@ -676,6 +815,9 @@ void disposeJpgData(JpgData jdata)
 		free(jdata->quanY[i]);
 		free(jdata->quanCb[i]);
 		free(jdata->quanCr[i]);
+		free(jdata->zzY[i]);
+		free(jdata->zzCb[i]);
+		free(jdata->>zzCr[i]);
 	}
 	
 	free(jdata->YBlocks);
@@ -684,6 +826,9 @@ void disposeJpgData(JpgData jdata)
 	free(jdata->quanY);
 	free(jdata->quanCb);
 	free(jdata->quanCr);
+	free(jdata->zzY);
+	free(jdata->zzCb);
+	free(jdata->zzCr);
 	// free the whole struct
 	free(jdata);
 }

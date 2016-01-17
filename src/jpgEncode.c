@@ -635,12 +635,11 @@ void quantise(JpgData jDat, double **dctY, double **dctCb, double **dctCr, int s
 // re-orders the coefficients of the quantized matrices
 void zigZag(JpgData jDat)
 {
-	// read the quan coefficients
-	// printf("Not yet implemented.\n");
 	int i = 0, j = 0;
 	int *sX = NULL, *sY = NULL;
 	int startX = 0, startY = 0;
 	int cX = 0, cY = 0;
+	int curBlock = 0;
 
 	/*
 	const char zzOrder[BLOCK_SIZE][BLOCK_SIZE] = {{0, 1, 5, 6, 14, 15, 27, 28},  // Order in which to read the quan coefficients
@@ -697,11 +696,23 @@ void zigZag(JpgData jDat)
 		for (j = 0; j < NUM_COEFFICIENTS; j++){
 			cX = c[j].x;
 			cY = c[j].y;
-			jDat->zzY[curBlock][j] = jDat->quanY[startY+ cY][startX + cX];
-			jDat->zzCb[curBlock][j] = jDat->quanCb[startY + cY][startX + cX];
-			jDat->zzCr[curBlock][j] = jDat->quanCr[startY + cY][startX + cX];	
+			jDat->zzY[curBlock - 1][j] = jDat->quanY[startY+ cY][startX + cX];
+			jDat->zzCb[curBlock - 1][j] = jDat->quanCb[startY + cY][startX + cX];
+			jDat->zzCr[curBlock - 1][j] = jDat->quanCr[startY + cY][startX + cX];	
 		}
 	}
+
+	#ifdef DEBUG_ZZ
+		printf("dbg: zig-zag: \n");
+		for (i = 0; i < jDat->numBlocks; i++){
+			printf("Block num: %d.\n", i + 1);
+			for (j = 0; j < NUM_COEFFICIENTS; j++){
+				printf("%d ", jDat->zzY[i][j]);
+			}
+
+			printf("\n");
+		}
+	#endif
 
 	free(c);
 	free(sX);
@@ -817,7 +828,7 @@ void disposeJpgData(JpgData jdata)
 		free(jdata->quanCr[i]);
 		free(jdata->zzY[i]);
 		free(jdata->zzCb[i]);
-		free(jdata->>zzCr[i]);
+		free(jdata->zzCr[i]);
 	}
 	
 	free(jdata->YBlocks);

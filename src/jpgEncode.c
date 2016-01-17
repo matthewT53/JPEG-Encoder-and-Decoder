@@ -35,6 +35,8 @@
 #define DEBUG_DCT // debugging constant for the dct process
 #define DEBUG_QUAN // debugging constant for the quan process
 #define DEBUG_ZZ // debugging constant for zig-zag process
+#define DEBUG_DPCM // debugging constant for DPCM process
+#define DEBUG_RUN // debugging constant for run length coding
 
 // #define LEVEL_SHIFT
 #define QUAN_READY
@@ -51,11 +53,13 @@
 	* https://www.cs.auckland.ac.nz/courses/compsci708s1c/lectures/jpeg_mpeg/jpeg.html
 	* http://www.dfrws.org/2008/proceedings/p21-kornblum_pres.pdf -> Quantization quality scaling
 	* http://www.dmi.unict.it/~battiato/EI_MOBILE0708/JPEG%20%28Bruna%29.pdf
-	* http://cnx.org/contents/eMc9DKWD@5/JPEG-Entropy-Coding -> Zig-zag: "Borrowed the order matrix"
+	* http://cnx.org/contents/eMc9DKWD@5/JPEG-Entropy-Coding -> Zig-zag: "Borrowed" the order matrix
 	* http://www.pcs-ip.eu/index.php/main/edu/7 -> zig-zag ordering + entropy encoding 
+	* http://users.ece.utexas.edu/~ryerraballi/MSB/pdfs/M4L1.pdf -> DPCM and Run length encoding
 	* http://www.impulseadventure.com/photo/jpeg-huffman-coding.html -> Huffman encoding
+	* http://www.cs.cf.ac.uk/Dave/MM/BSC_MM_CALLER/PDF/10_CM0340_JPEG.pdf -> good overview of jpeg
 
-	Algorithm:
+	Algorithm: Quantization quality factor
 	1 < Q < 100 ( quality range );
 	s = (Q < 50) ? 5000/Q : 200 - 2Q;
 	Ts[i] (element in new quan table) = ( S * Tb[i] ( element in original quan table ) + 50 ) / 100;
@@ -67,6 +71,8 @@
 	Things to do:
 	* add down sampling (might need to), current setting is 4:4:4
 	* add support for quality scaling (user specifies a quality)
+	* store the quantisation table inside jDat
+	* instead of freeing everything at once, free resources when we no longer require them
 	
 */
 
@@ -137,7 +143,7 @@ void quantise(JpgData jDat, double **dctY, double **dctCb, double **dctCr, int s
 
 // Zig-Zag ordering
 /*
-	Re-orders the coefficients in the quantized tables of Y,Cb and Cr in a zag-zag fashion.
+	Maps 8x8 blocks into 1x64 vectors
 	Input: 
 	* jDat containing quantised blocks
 
@@ -145,6 +151,22 @@ void quantise(JpgData jDat, double **dctY, double **dctCb, double **dctCr, int s
 	* adds to the JpgData struct the zig-zag ordering of coeffcients from each quan block
 */
 void zigZag(JpgData jDat);
+
+// Encoding functions
+/*  DCPM
+	Encodes the difference between DC values from current block and previous block
+	Input: jDat structure
+	Output: Updates the zig-zag vectors in the struct
+*/
+void dpcm(JpgData jDat); // encodes the DC values (upper-left values in the table)
+
+/*
+	Run Length Coding
+	Compresses the AC values in the zig-zag vector. This is applied to the 1x63 vector.
+	Input: 
+	Output:
+*/
+void runLength(JpgData jDat); // encodes the AC values in the block (the other values)
 
 /*
 	Input:
@@ -263,15 +285,23 @@ void encodeRGBToJpgDisk(const char *jpgFile, Pixel rgbBuffer, unsigned int numPi
 		// preprocess the image data
 		preprocessJpg(jD, rgbBuffer, numPixels);
 
-		// DCT	
+		// DCT and quantization
 		dct(jD);
 
-		// entropy coding
+		// zig-zag ordering: Convert 8x8 block into 1x64 vector
 		zigZag(jD);
 
-		// Huffman coding
+		// DPCM on DC coefficients
+		dpcm(jD);
+
+		// run length coding on AC coefficients
+		runLength(jD);
+
+		// huffman (entropy) coding
 
 		// write binary contents to disk
+
+		disposeJpgData(jD);
 	}
 	
 	else{
@@ -587,7 +617,7 @@ void dct(JpgData jDat)
 }
 
 // quantises the image
-void quantise(JpgData jDat, double **dctY, double **dctCb, double **dctCr, int sx, int sy) // may have ot modify for down sampling
+void quantise(JpgData jDat, double **dctY, double **dctCb, double **dctCr, int sx, int sy) // may have to modify for down sampling
 {
 	int q = jDat->quality;
 	int s = 0;
@@ -639,17 +669,6 @@ void zigZag(JpgData jDat)
 	int cX = 0, cY = 0;
 	int curBlock = 0;
 
-	/*
-	const char zzOrder[BLOCK_SIZE][BLOCK_SIZE] = {{0, 1, 5, 6, 14, 15, 27, 28},  // Order in which to read the quan coefficients
-												  {2, 4, 7, 13, 16, 26, 29, 42}, 
-										          {3, 8, 12, 17, 25, 30, 41, 43}, 
-												  {9, 11, 18, 24, 31, 40, 44, 53}, 
-						    					  {10, 19, 23, 32, 39, 45, 52, 54},
-											      {20, 22, 33, 38, 46, 51, 55, 60},
-												  {21, 34, 37, 47, 50, 56, 59, 61},
-												  {35, 36, 48, 49, 57, 58, 62, 63}};
-	*/
-
 	Coordinate *c = malloc(sizeof(Coordinate) * NUM_COEFFICIENTS);
 
 	// get space to hold the starting coordinates for each block
@@ -667,24 +686,6 @@ void zigZag(JpgData jDat)
 	} 
 
 	assert(sX != NULL && sY != NULL && c != NULL);
-	
-	/*
-	// very expensive algorithm
-	// store the zig-zag ordered quan coefficients
-	for (curBlock = 1; curBlock <= jDat->numBlocks; curBlock++){ // process each block
-		blockToCoords(jDat, curBlock, sX, sY);
-		for (pos = 0; pos < NUM_COEFFICIENTS; pos++){ // fairly expensive process, can be made more efficient
-			foundPos = FALSE;
-			for (i = 0; i < BLOCK_SIZE && !foundPos; i++){
-				for (j = 0; j < BLOCK_SIZE; j++){
-					if (zzOrder[i][j] == pos) { foundPos = TRUE; break; }
-				}
-			}
-		}
-	}
-
-	*/
-
 	loadCoordinates(c);
 	// process earch block from the quantized matrices
 	for (curBlock = 1; curBlock <= jDat->numBlocks; curBlock++){
@@ -715,6 +716,32 @@ void zigZag(JpgData jDat)
 	free(c);
 	free(sX);
 	free(sY);
+}
+
+// Maps a 8x8 block into a 1x64 vector
+void dpcm(JpgData jDat)
+{
+	int curBlock = 0;
+	// search through all the blocks
+	for (curBlock = jDat->numBlocks - 1; curBlock > 0; curBlock--){ // iterate in reverse to avoid incorrectly altering results of elements ahead
+		jDat->zzY[curBlock][0] -= jDat->zzY[curBlock - 1][0]; // get the difference between current DC and previous DC
+		jDat->zzCb[curBlock][0] -= jDat->zzCb[curBlock - 1][0];
+		jDat->zzCr[curBlock][0] -= jDat->zzCr[curBlock - 1][0];
+	}
+
+	#ifdef DEBUG_DPCM
+		int i = 0;
+		printf("Debugging dpcm: \n");
+		for (i = 0; i < jDat->numBlocks; i++){
+			printf("Block: %d = %d\n", i + 1, jDat->zzY[i][0]);
+		}
+	#endif 
+}
+
+// encodes the 1x63 AC coefficients
+void runLength(JpgData jDat)
+{
+	printf("Not yet implemented.\n");
 }
 
 // converts block number to starting and ending coordinates (x,y)

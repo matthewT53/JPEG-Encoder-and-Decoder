@@ -186,7 +186,6 @@ static int determineFileSize(FILE *f); // determines the size of a file
 static void dbg_out_file(Pixel p, int size); // dumps the contents of buf into a file 
 #endif
 
-#ifdef QUAN_READY
 // default jpeg quantization matrix for 50% quality (luminance)
 static const int quanMatrixLum[QUAN_MAT_SIZE][QUAN_MAT_SIZE] = {{16, 11, 10, 16, 24, 40, 51, 61},	
 														 {12, 12, 14, 19, 26, 58, 60, 55}, 
@@ -207,7 +206,6 @@ static const int quanMatrixChr[QUAN_MAT_SIZE][QUAN_MAT_SIZE] = {{17, 18, 24, 47,
 														  {99, 99, 99, 99, 99, 99, 99, 99},
 														  {99, 99, 99, 99, 99, 99, 99, 99}};	
 
-#endif
 
 // can easily be adapted to other image formats other than BMP - mainly used for testing
 Pixel imageToRGB(const char *imageName, int *bufSize)

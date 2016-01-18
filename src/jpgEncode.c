@@ -98,6 +98,11 @@ typedef struct _jpegData{
 	int **zzY; // rows = # blocks, cols = # coefficients which is 64
 	int **zzCb;
 	int **zzCr;
+
+	// encoding stuff
+	int **encodeY;
+	int **encodeCb;
+	int **encodeCr;
 	
 	// common image properties
 	unsigned int width;
@@ -179,6 +184,14 @@ void runLength(JpgData jDat); // encodes the AC values in the block (the other v
 	Note: Don't forget to free() x and y
 
 */
+
+// utility functions for freeing resources
+void dispose_YCbCr(JpgData jDat); // frees the YCbCr arrays
+void dispose_blocks(JpgData jDat); // frees the 8x8 blocks
+void dispose_quan(JpgData jDat); // frees the quantiation matices for each component
+void dispose_zz(JpgData jDat); // frees the zig-zag vectors for each component
+void dispose_encode(JpgData jDat); // frees the encoded data for each component
+
 void blockToCoords(JpgData jDat, int bn, int *x, int *y);
 void loadCoordinates(Coordinate *c); // loads co-ordinates that indicate the order in which the quan coefficients should be analysed
 
@@ -521,7 +534,7 @@ void dct(JpgData jDat)
 	double **dctCb = NULL;
 	double **dctCr = NULL;
 
-	dctY = malloc(sizeof(double *) * BLOCK_SIZE);
+	dctY = malloc(sizeof(double *) * BLOCK_SIZE); // OPT: Don't need to dynamically allocate, just create an 8x8 array
 	dctCb = malloc(sizeof(double *) * BLOCK_SIZE);
 	dctCr = malloc(sizeof(double *) * BLOCK_SIZE);
 
@@ -669,10 +682,10 @@ void zigZag(JpgData jDat)
 	int cX = 0, cY = 0;
 	int curBlock = 0;
 
-	Coordinate *c = malloc(sizeof(Coordinate) * NUM_COEFFICIENTS);
+	Coordinate *c = malloc(sizeof(Coordinate) * NUM_COEFFICIENTS); // same here don't need to dynamically allocate
 
 	// get space to hold the starting coordinates for each block
-	sX = malloc(sizeof(int) * 2);
+	sX = malloc(sizeof(int) * 2); // don't ned to dynamically allocate since the size is known
 	sY = malloc(sizeof(int) * 2);
 
 	jDat->zzY = malloc(sizeof(int *) * jDat->numBlocks);
@@ -722,18 +735,35 @@ void zigZag(JpgData jDat)
 void dpcm(JpgData jDat)
 {
 	int curBlock = 0;
+	int i = 0;
+	// allocate memory to store the encoded data
+	jDat->encodeY = malloc(sizeof(int *) * jDat->numBlocks);
+	jDat->encodeCb = malloc(sizeof(int *) * jDat->numBlocks);
+	jDat->encodeCr = malloc(sizeof(int *) * jDat->numBlocks);
+
+	assert(jDat->encodeY != NULL && jDat->encodeCb != NULL && jDat->encodeCr != NULL);
+	
+	for (i = 0; i < jDat->numBlocks; i++){
+		jDat->encodeY[i] = calloc(130, sizeof(int));
+		jDat->encodeCb[i] = calloc(130, sizeof(int));
+		jDat->encodeCr[i] = calloc(130, sizeof(int));
+		assert(jDat->encodeY[i] != NULL && jDat->encodeCb[i] != NULL && jDat->encodeCr[i] != NULL);
+	}
+
 	// search through all the blocks
-	for (curBlock = jDat->numBlocks - 1; curBlock > 0; curBlock--){ // iterate in reverse to avoid incorrectly altering results of elements ahead
-		jDat->zzY[curBlock][0] -= jDat->zzY[curBlock - 1][0]; // get the difference between current DC and previous DC
-		jDat->zzCb[curBlock][0] -= jDat->zzCb[curBlock - 1][0];
-		jDat->zzCr[curBlock][0] -= jDat->zzCr[curBlock - 1][0];
+	jDat->encodeY[0][0] = jDat->zzY[0][0];
+	jDat->encodeCb[0][0] = jDat->zzCb[0][0];
+	jDat->encodeCr[0][0] = jDat->zzCr[0][0];
+	for (curBlock = 1; curBlock < jDat->numBlocks; curBlock++){ // iterate in reverse to avoid incorrectly altering results of elements ahead
+		jDat->encodeY[curBlock][0] = jDat->zzY[curBlock][0] - jDat->zzY[curBlock - 1][0];
+		jDat->encodeCb[curBlock][0] = jDat->zzCb[curBlock][0] - jDat->zzCb[curBlock - 1][0];
+		jDat->encodeCr[curBlock][0] = jDat->zzCr[curBlock][0] - jDat->zzCr[curBlock - 1][0];
 	}
 
 	#ifdef DEBUG_DPCM
-		int i = 0;
 		printf("Debugging dpcm: \n");
 		for (i = 0; i < jDat->numBlocks; i++){
-			printf("Block: %d = %d\n", i + 1, jDat->zzY[i][0]);
+			printf("Block: %d = %d\n", i + 1, jDat->encodeY[i][0]);
 		}
 	#endif 
 }
@@ -741,7 +771,59 @@ void dpcm(JpgData jDat)
 // encodes the 1x63 AC coefficients
 void runLength(JpgData jDat)
 {
-	printf("Not yet implemented.\n");
+	int i = 0, j = 0;
+	int k1 = 0, k2 = 0, k3 = 0; // keep the next pos in the encode array to store the pairs
+	int z1 = 0, z2 = 0, z3 = 0; // count the number of zeroes
+
+	for (i = 0; i < jDat->numBlocks; i++){
+		k1 = k2 = k3 = 1; // reset pos back to the start of the AC values
+		z1 = z2 = z3 = 0; // reset the zero counters
+		for (j = 1; j < NUM_COEFFICIENTS; j++){ // skip the DC coefficient and process the AC coefs
+			if (jDat->zzY[i][j] != 0){ // store the value 
+				jDat->encodeY[i][k1] = z1;
+				jDat->encodeY[i][k1 + 1] = jDat->zzY[i][j];
+				k1 += 2;
+				z1 = 0;
+			}
+
+			else{ // non-zero coefficient not found
+				z1++;
+			}
+
+			if (jDat->zzCb[i][j] != 0){
+				jDat->encodeCb[i][k2] = z2;
+				jDat->encodeCb[i][k2 + 1] = jDat->zzCb[i][j];
+				k2 += 2;
+				z2 = 0;
+			}
+
+			else{
+				z2++;
+			}
+
+			if (jDat->zzCr[i][j] != 0){
+				jDat->encodeCr[i][k3] = z3;
+				jDat->encodeCr[i][k3 + 1] = jDat->zzCr[i][j];
+				k3 += 2;
+				z3 = 0;
+			}
+
+			else{
+				z3++;
+			}
+		}
+	}
+
+	#ifdef DEBUG_RUN
+		printf("Debugging run length coding.\n");
+		for (i = 0; i < jDat->numBlocks; i++){
+			printf("Block: %d\n", i + 1);
+			for (j = 0; j < NUM_COEFFICIENTS; j++){
+				printf("%d ", jDat->encodeY[i][j]); 
+			}
+			printf("\n");
+		}
+	#endif
 }
 
 // converts block number to starting and ending coordinates (x,y)

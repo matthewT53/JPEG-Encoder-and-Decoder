@@ -29,6 +29,10 @@
 // zig-zag stuff
 #define NUM_COEFFICIENTS 64
 
+// run length encoding constants
+#define MAX_ZEROES 16
+#define ZRL_VALUE 15
+
 // #define DEBUG // debugging constant
 // #define DEBUG_PRE // debugging constant for the preprocessing code
 // #define DEBUG_BLOCKS // debugging constant for the code that creates 8x8 blocks
@@ -76,6 +80,13 @@
 	
 */
 
+// run length encoding as shown on wikipedia
+typedef struct _symbol{
+	char s1; // symbol 1: runlength (4 bits), size (4 bits)
+	int s2; // synbol 2: amplitude
+
+} symbol;
+
 typedef struct _jpegData{
 	// YCbCr data
 	char *Y; // luminance (black and white comp)
@@ -100,9 +111,9 @@ typedef struct _jpegData{
 	int **zzCr;
 
 	// encoding stuff
-	int **encodeY;
-	int **encodeCb;
-	int **encodeCr;
+	symbol **encodeY;
+	symbol **encodeCb;
+	symbol **encodeCr;
 	
 	// common image properties
 	unsigned int width;
@@ -737,33 +748,33 @@ void dpcm(JpgData jDat)
 	int curBlock = 0;
 	int i = 0;
 	// allocate memory to store the encoded data
-	jDat->encodeY = malloc(sizeof(int *) * jDat->numBlocks);
-	jDat->encodeCb = malloc(sizeof(int *) * jDat->numBlocks);
-	jDat->encodeCr = malloc(sizeof(int *) * jDat->numBlocks);
+	jDat->encodeY = malloc(sizeof(symbol *) * jDat->numBlocks);
+	jDat->encodeCb = malloc(sizeof(symbol *) * jDat->numBlocks);
+	jDat->encodeCr = malloc(sizeof(symbol *) * jDat->numBlocks);
 
 	assert(jDat->encodeY != NULL && jDat->encodeCb != NULL && jDat->encodeCr != NULL);
 	
 	for (i = 0; i < jDat->numBlocks; i++){
-		jDat->encodeY[i] = calloc(130, sizeof(int));
-		jDat->encodeCb[i] = calloc(130, sizeof(int));
-		jDat->encodeCr[i] = calloc(130, sizeof(int));
+		jDat->encodeY[i] = calloc(NUM_COEFFICIENTS, sizeof(symbol));
+		jDat->encodeCb[i] = calloc(NUM_COEFFICIENTS, sizeof(symbol));
+		jDat->encodeCr[i] = calloc(NUM_COEFFICIENTS, sizeof(symbol));
 		assert(jDat->encodeY[i] != NULL && jDat->encodeCb[i] != NULL && jDat->encodeCr[i] != NULL);
 	}
 
 	// search through all the blocks
-	jDat->encodeY[0][0] = jDat->zzY[0][0];
-	jDat->encodeCb[0][0] = jDat->zzCb[0][0];
-	jDat->encodeCr[0][0] = jDat->zzCr[0][0];
+	jDat->encodeY[0][0].s2 = jDat->zzY[0][0];
+	jDat->encodeCb[0][0].s2 = jDat->zzCb[0][0];
+	jDat->encodeCr[0][0].s2 = jDat->zzCr[0][0];
 	for (curBlock = 1; curBlock < jDat->numBlocks; curBlock++){ // iterate in reverse to avoid incorrectly altering results of elements ahead
-		jDat->encodeY[curBlock][0] = jDat->zzY[curBlock][0] - jDat->zzY[curBlock - 1][0];
-		jDat->encodeCb[curBlock][0] = jDat->zzCb[curBlock][0] - jDat->zzCb[curBlock - 1][0];
-		jDat->encodeCr[curBlock][0] = jDat->zzCr[curBlock][0] - jDat->zzCr[curBlock - 1][0];
+		jDat->encodeY[curBlock][0].s2 = jDat->zzY[curBlock][0] - jDat->zzY[curBlock - 1][0];
+		jDat->encodeCb[curBlock][0].s2 = jDat->zzCb[curBlock][0] - jDat->zzCb[curBlock - 1][0];
+		jDat->encodeCr[curBlock][0].s2 = jDat->zzCr[curBlock][0] - jDat->zzCr[curBlock - 1][0];
 	}
 
 	#ifdef DEBUG_DPCM
 		printf("Debugging dpcm: \n");
 		for (i = 0; i < jDat->numBlocks; i++){
-			printf("Block: %d = %d\n", i + 1, jDat->encodeY[i][0]);
+			printf("Block: %d = %d\n", i + 1, jDat->encodeY[i][0].s2);
 		}
 	#endif 
 }
@@ -775,37 +786,46 @@ void runLength(JpgData jDat)
 	int k1 = 0, k2 = 0, k3 = 0; // keep the next pos in the encode array to store the pairs
 	int z1 = 0, z2 = 0, z3 = 0; // count the number of zeroes
 
-	for (i = 0; i < jDat->numBlocks; i++){
+	for (i = 0; i < jDat->numBlocks; i++){ // iterate through the blocks
 		k1 = k2 = k3 = 1; // reset pos back to the start of the AC values
 		z1 = z2 = z3 = 0; // reset the zero counters
 		for (j = 1; j < NUM_COEFFICIENTS; j++){ // skip the DC coefficient and process the AC coefs
-			if (jDat->zzY[i][j] != 0){ // store the value 
-				jDat->encodeY[i][k1] = z1;
-				jDat->encodeY[i][k1 + 1] = jDat->zzY[i][j];
+			if (jDat->zzY[i][j] != 0 || z1 == MAX_ZEROES){
+				if (z1 == MAX_ZEROES) { 
+					jDat->encodeY[i][k1].s1 |= ZRL_VALUE; // add the # zeroes in the correct part of the symbol
+				}
+				else { jDat->encodeY[i][k1].s1 |= z1; }
+				jDat->encodeY[i][k1].s1 <<= 4; // shift by 4 bits to put the #zeroes in the run length part of the symbol
+				jDat->encodeY[i][k1].s2 = jDat->zzY[i][j]; // don't forget about the amplitude
 				k1 += 2;
-				z1 = 0;
 			}
 
-			else{ // non-zero coefficient not found
+			else{
 				z1++;
 			}
 
-			if (jDat->zzCb[i][j] != 0){
-				jDat->encodeCb[i][k2] = z2;
-				jDat->encodeCb[i][k2 + 1] = jDat->zzCb[i][j];
+			if (jDat->zzCb[i][j] != 0 || z2 == MAX_ZEROES){
+				if (z2 == MAX_ZEROES) { 
+					jDat->encodeCb[i][k2].s1 |= ZRL_VALUE; // add the # zeroes in the correct part of the symbol
+				}
+				else { jDat->encodeCb[i][k2].s1 |= z2; }
+				jDat->encodeCb[i][k2].s1 <<= 4; // shift by 4 bits to put the #zeroes in the run length part of the symbol
+				jDat->encodeCb[i][k2].s2 = jDat->zzCb[i][j]; // don't forget about the amplitude
 				k2 += 2;
-				z2 = 0;
 			}
 
 			else{
 				z2++;
 			}
 
-			if (jDat->zzCr[i][j] != 0){
-				jDat->encodeCr[i][k3] = z3;
-				jDat->encodeCr[i][k3 + 1] = jDat->zzCr[i][j];
+			if (jDat->zzCr[i][j] != 0 || z3 == MAX_ZEROES){
+				if (z3 == MAX_ZEROES) { 
+					jDat->encodeCr[i][k3].s1 |= ZRL_VALUE; // add the # zeroes in the correct part of the symbol
+				}
+				else { jDat->encodeCr[i][k3].s1 |= z3; }
+				jDat->encodeCr[i][k3].s1 <<= 4; // shift by 4 bits to put the #zeroes in the run length part of the symbol
+				jDat->encodeCr[i][k3].s2 = jDat->zzCr[i][j]; // don't forget about the amplitude
 				k3 += 2;
-				z3 = 0;
 			}
 
 			else{
@@ -815,11 +835,16 @@ void runLength(JpgData jDat)
 	}
 
 	#ifdef DEBUG_RUN
+		char runL = 0, size = 0;
 		printf("Debugging run length coding.\n");
 		for (i = 0; i < jDat->numBlocks; i++){
 			printf("Block: %d\n", i + 1);
 			for (j = 0; j < NUM_COEFFICIENTS; j++){
-				printf("%d ", jDat->encodeY[i][j]); 
+				runL = jDat->encodeY[i][j].s1 >>= 4;
+				size = jDat->encodeY[i][j].s1 - 240;
+				printf("Run length: %d\n", runL);
+				printf("Size: %d\n", size);
+				printf("Amplitude: %d\n", jDat->encodeY[i][j].s2);
 			}
 			printf("\n");
 		}

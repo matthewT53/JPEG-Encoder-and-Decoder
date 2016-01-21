@@ -545,7 +545,7 @@ void dct(JpgData jDat)
 	double **dctCb = NULL;
 	double **dctCr = NULL;
 
-	dctY = malloc(sizeof(double *) * BLOCK_SIZE); // OPT: Don't need to dynamically allocate, just create an 8x8 array
+	dctY = malloc(sizeof(double *) * BLOCK_SIZE); // OPT: Don't need to dynamically allocate, just create an 8x8 array on the stack
 	dctCb = malloc(sizeof(double *) * BLOCK_SIZE);
 	dctCr = malloc(sizeof(double *) * BLOCK_SIZE);
 
@@ -840,7 +840,7 @@ void runLength(JpgData jDat)
 		for (i = 0; i < jDat->numBlocks; i++){
 			printf("Block: %d\n", i + 1);
 			for (j = 0; j < NUM_COEFFICIENTS; j++){
-				runL = jDat->encodeY[i][j].s1 >>= 4;
+				runL = jDat->encodeY[i][j].s1 >> 4;
 				size = jDat->encodeY[i][j].s1 - 240;
 				printf("Run length: %d\n", runL);
 				printf("Size: %d\n", size);

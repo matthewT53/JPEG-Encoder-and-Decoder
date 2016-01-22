@@ -36,15 +36,13 @@
 // #define DEBUG // debugging constant
 // #define DEBUG_PRE // debugging constant for the preprocessing code
 // #define DEBUG_BLOCKS // debugging constant for the code that creates 8x8 blocks
-#define DEBUG_DCT // debugging constant for the dct process
-#define DEBUG_QUAN // debugging constant for the quan process
+// #define DEBUG_DCT // debugging constant for the dct process
+// #define DEBUG_QUAN // debugging constant for the quan process
 #define DEBUG_ZZ // debugging constant for zig-zag process
 #define DEBUG_DPCM // debugging constant for DPCM process
 #define DEBUG_RUN // debugging constant for run length coding
 
 // #define LEVEL_SHIFT
-#define QUAN_READY
-
 
 /*  
 	To clear confusion, just in case.
@@ -82,7 +80,7 @@
 
 // run length encoding as shown on wikipedia
 typedef struct _symbol{
-	char s1; // symbol 1: runlength (4 bits), size (4 bits)
+	unsigned char s1; // symbol 1: runlength (4 bits), size (4 bits)
 	int s2; // synbol 2: amplitude
 
 } symbol;
@@ -185,6 +183,12 @@ void dpcm(JpgData jDat); // encodes the DC values (upper-left values in the tabl
 void runLength(JpgData jDat); // encodes the AC values in the block (the other values)
 
 /*
+	Huffman coding - compresses the remaining data
+	
+*/
+void huffmanEncoding(JpgData jDat);
+
+/*
 	Input:
 	* bn = block number 0 < bn <= numBlocks
 
@@ -195,6 +199,21 @@ void runLength(JpgData jDat); // encodes the AC values in the block (the other v
 	Note: Don't forget to free() x and y
 
 */
+void blockToCoords(JpgData jDat, int bn, int *x, int *y); // more of a utility function, but i think its a critical part of the code
+/* ================== END of Encoding functions ==================== */
+
+/* ================== Utility functions ========================= */
+
+// changing width and height is ok since we can later modify it again in the header of the image
+void fillWidth(JpgData jDat, int nEdges); // extends the width of the image
+void fillHeight(JpgData jDat, int nEdges); // extends the height of the image
+
+void loadCoordinates(Coordinate *c); // loads co-ordinates that indicate the order in which the quan coefficients should be analysed
+void sanitise(symbol *s); // removes random ZRL and places the EOB in the correct position
+int numOfBits(int x); // determines the # bits required to represent a number x
+
+// free resources
+void disposeJpgData(JpgData jdat);
 
 // utility functions for freeing resources
 void dispose_YCbCr(JpgData jDat); // frees the YCbCr arrays
@@ -202,26 +221,6 @@ void dispose_blocks(JpgData jDat); // frees the 8x8 blocks
 void dispose_quan(JpgData jDat); // frees the quantiation matices for each component
 void dispose_zz(JpgData jDat); // frees the zig-zag vectors for each component
 void dispose_encode(JpgData jDat); // frees the encoded data for each component
-
-void blockToCoords(JpgData jDat, int bn, int *x, int *y);
-void loadCoordinates(Coordinate *c); // loads co-ordinates that indicate the order in which the quan coefficients should be analysed
-
-
-
-
-/* ================== END of Encoding functions ==================== */
-
-/* ================== Additional utility functions ========================= */
-
-// get the x and y index of a certain # block
-void getBlockIndex();
-
-// changing width and height is ok since we can later modify it again in the header of the image
-void fillWidth(JpgData jDat, int nEdges); // extends the width of the image
-void fillHeight(JpgData jDat, int nEdges); // extends the height of the image
-
-// free resources
-void disposeJpgData(JpgData jdat);
 
 // simple utility and debugging functions
 static Pixel newPixBuf(int n); // creates a new pixel buffer with n pixels
@@ -250,8 +249,7 @@ static const int quanMatrixChr[QUAN_MAT_SIZE][QUAN_MAT_SIZE] = {{17, 18, 24, 47,
 														  {99, 99, 99, 99, 99, 99, 99, 99}, 
 														  {99, 99, 99, 99, 99, 99, 99, 99},
 														  {99, 99, 99, 99, 99, 99, 99, 99},
-														  {99, 99, 99, 99, 99, 99, 99, 99}};	
-
+														  {99, 99, 99, 99, 99, 99, 99, 99}};
 
 // can easily be adapted to other image formats other than BMP - mainly used for testing
 Pixel imageToRGB(const char *imageName, int *bufSize)
@@ -322,6 +320,7 @@ void encodeRGBToJpgDisk(const char *jpgFile, Pixel rgbBuffer, unsigned int numPi
 		runLength(jD);
 
 		// huffman (entropy) coding
+		huffmanEncoding(jD);
 
 		// write binary contents to disk
 
@@ -784,20 +783,23 @@ void runLength(JpgData jDat)
 {
 	int i = 0, j = 0;
 	int k1 = 0, k2 = 0, k3 = 0; // keep the next pos in the encode array to store the pairs
-	int z1 = 0, z2 = 0, z3 = 0; // count the number of zeroes
+	unsigned char z1 = 0, z2 = 0, z3 = 0; // count the number of zeroes
 
 	for (i = 0; i < jDat->numBlocks; i++){ // iterate through the blocks
 		k1 = k2 = k3 = 1; // reset pos back to the start of the AC values
 		z1 = z2 = z3 = 0; // reset the zero counters
+	
 		for (j = 1; j < NUM_COEFFICIENTS; j++){ // skip the DC coefficient and process the AC coefs
 			if (jDat->zzY[i][j] != 0 || z1 == MAX_ZEROES){
-				if (z1 == MAX_ZEROES) { 
+				if (z1 == MAX_ZEROES){ 
 					jDat->encodeY[i][k1].s1 |= ZRL_VALUE; // add the # zeroes in the correct part of the symbol
 				}
 				else { jDat->encodeY[i][k1].s1 |= z1; }
 				jDat->encodeY[i][k1].s1 <<= 4; // shift by 4 bits to put the #zeroes in the run length part of the symbol
+				jDat->encodeY[i][k1].s1 |= (unsigned char) numOfBits(jDat->zzY[i][j]);
 				jDat->encodeY[i][k1].s2 = jDat->zzY[i][j]; // don't forget about the amplitude
-				k1 += 2;
+				z1 = 0;
+				k1++;
 			}
 
 			else{
@@ -805,13 +807,15 @@ void runLength(JpgData jDat)
 			}
 
 			if (jDat->zzCb[i][j] != 0 || z2 == MAX_ZEROES){
-				if (z2 == MAX_ZEROES) { 
+				if (z2 == MAX_ZEROES){ 
 					jDat->encodeCb[i][k2].s1 |= ZRL_VALUE; // add the # zeroes in the correct part of the symbol
 				}
 				else { jDat->encodeCb[i][k2].s1 |= z2; }
 				jDat->encodeCb[i][k2].s1 <<= 4; // shift by 4 bits to put the #zeroes in the run length part of the symbol
+				jDat->encodeCb[i][k2].s1 |= (unsigned char) numOfBits(jDat->zzCb[i][j]);
 				jDat->encodeCb[i][k2].s2 = jDat->zzCb[i][j]; // don't forget about the amplitude
-				k2 += 2;
+				z2 = 0;
+				k2++;
 			}
 
 			else{
@@ -819,36 +823,68 @@ void runLength(JpgData jDat)
 			}
 
 			if (jDat->zzCr[i][j] != 0 || z3 == MAX_ZEROES){
-				if (z3 == MAX_ZEROES) { 
+				if (z3 == MAX_ZEROES){ 
 					jDat->encodeCr[i][k3].s1 |= ZRL_VALUE; // add the # zeroes in the correct part of the symbol
 				}
 				else { jDat->encodeCr[i][k3].s1 |= z3; }
 				jDat->encodeCr[i][k3].s1 <<= 4; // shift by 4 bits to put the #zeroes in the run length part of the symbol
+				jDat->encodeCr[i][k3].s1 |= (unsigned char) numOfBits(jDat->zzCr[i][j]);
 				jDat->encodeCr[i][k3].s2 = jDat->zzCr[i][j]; // don't forget about the amplitude
-				k3 += 2;
+				z3 = 0;
+				k3++;
 			}
 
 			else{
 				z3++;
 			}
 		}
+	
+		// clean the run-length arrays
+		sanitise(jDat->encodeY[i]);
+		sanitise(jDat->encodeCb[i]);
+		sanitise(jDat->encodeCr[i]);
 	}
 
 	#ifdef DEBUG_RUN
-		char runL = 0, size = 0;
+		unsigned char runL = 0;
+		unsigned char size = 0;
 		printf("Debugging run length coding.\n");
 		for (i = 0; i < jDat->numBlocks; i++){
 			printf("Block: %d\n", i + 1);
-			for (j = 0; j < NUM_COEFFICIENTS; j++){
+			for (j = 1; j < NUM_COEFFICIENTS; j++){ 	
 				runL = jDat->encodeY[i][j].s1 >> 4;
-				size = jDat->encodeY[i][j].s1 - 240;
-				printf("Run length: %d\n", runL);
-				printf("Size: %d\n", size);
-				printf("Amplitude: %d\n", jDat->encodeY[i][j].s2);
+				size = jDat->encodeY[i][j].s1 - (runL << 4);
+				if (runL == 0 && jDat->encodeY[i][j].s2 == 0) { printf("EOB\n"); break; }
+				printf("([r = %d, s = %d], A = %d)\n", runL, size, jDat->encodeY[i][j].s2);
 			}
 			printf("\n");
 		}
 	#endif
+}
+
+// removes incorrect ZRLs and assigns EOB to the correct position
+void sanitise(symbol *s)
+{
+	int i = 0;
+	for (i = NUM_COEFFICIENTS - 1; i >= 1; i--){
+		if (s[i].s2 != 0){ break; } // leaves after the first non-zero coefficient is encountered
+	}
+	s[i + 1].s1 = 0;
+}
+
+// determines the number of bits requried to represent the number x
+int numOfBits(int x)
+{
+	int n1 = 0, prevn = 0, nextn = 0;
+	int i = 0; // represents the number of bits required to represent the number x
+
+	prevn = n1; // first number in sequence
+	while (x < ((-1) * nextn) || x > nextn){ // loop until we find the correct number of bits
+		nextn = (2 * prevn) + 1;
+		prevn = nextn;
+		i++;
+	}
+	return i;
 }
 
 // converts block number to starting and ending coordinates (x,y)
@@ -867,8 +903,14 @@ void blockToCoords(JpgData jDat, int bn, int *x, int *y)
 	if (tw % w == 0) { y[0] -= 8; y[1] -= 8; } // reached the last block of a row
 	// set the starting and ending x values
 	x[0] = (tw % w) - 8;
-	if (x[0] == -8) { x[0] = w - 8; } // in last column, maths doesn't make sense
+	if (x[0] == -8) { x[0] = w - 8; } // in last column, maths doesn't make sense, need to do something weird
 	x[1] = x[0] + 8;
+}
+
+// applies the huffman algorithm to compress the run length data + the DCT coefficients
+void huffmanEncoding(JpgData jDat)
+{
+	printf("Not implemented yet.\n");
 }
 
 void loadCoordinates(Coordinate *c)

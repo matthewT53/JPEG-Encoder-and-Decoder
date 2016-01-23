@@ -746,6 +746,7 @@ void dpcm(JpgData jDat)
 {
 	int curBlock = 0;
 	int i = 0;
+
 	// allocate memory to store the encoded data
 	jDat->encodeY = malloc(sizeof(symbol *) * jDat->numBlocks);
 	jDat->encodeCb = malloc(sizeof(symbol *) * jDat->numBlocks);
@@ -768,12 +769,19 @@ void dpcm(JpgData jDat)
 		jDat->encodeY[curBlock][0].s2 = jDat->zzY[curBlock][0] - jDat->zzY[curBlock - 1][0];
 		jDat->encodeCb[curBlock][0].s2 = jDat->zzCb[curBlock][0] - jDat->zzCb[curBlock - 1][0];
 		jDat->encodeCr[curBlock][0].s2 = jDat->zzCr[curBlock][0] - jDat->zzCr[curBlock - 1][0];
+
+		// calculate the number of bits required to represent the values
+		jDat->encodeY[curBlock][0].s1 |= (unsigned char) numOfBits(jDat->encodeY[curBlock][0].s2);
+		jDat->encodeCb[curBlock][0].s1 |= (unsigned char) numOfBits(jDat->encodeCb[curBlock][0].s2);
+		jDat->encodeCr[curBlock][0].s1 |= (unsigned char) numOfBits(jDat->encodeCr[curBlock][0].s2);
 	}
 
 	#ifdef DEBUG_DPCM
+		unsigned char numBits = 0;
 		printf("Debugging dpcm: \n");
 		for (i = 0; i < jDat->numBlocks; i++){
-			printf("Block: %d = %d\n", i + 1, jDat->encodeY[i][0].s2);
+			numBits = jDat->encodeY[i][0].s1;
+			printf("Block: %d = %d and numBits = %d\n", i + 1, jDat->encodeY[i][0].s2, numBits);
 		}
 	#endif 
 }

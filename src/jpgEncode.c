@@ -52,6 +52,7 @@
 
 	Sources that assisted me:
 	* https://en.wikipedia.org/wiki/JPEG
+	* https://www.w3.org/Graphics/JPEG/itu-t81.pdf -> SPEC which is very convoluted
 	* https://www.cs.auckland.ac.nz/courses/compsci708s1c/lectures/jpeg_mpeg/jpeg.html
 	* http://www.dfrws.org/2008/proceedings/p21-kornblum_pres.pdf -> Quantization quality scaling
 	* http://www.dmi.unict.it/~battiato/EI_MOBILE0708/JPEG%20%28Bruna%29.pdf
@@ -184,6 +185,8 @@ void runLength(JpgData jDat); // encodes the AC values in the block (the other v
 
 /*
 	Huffman coding - compresses the remaining data
+
+	Uses the example huffman tables presented in the jpeg spec.
 	
 */
 void huffmanEncoding(JpgData jDat);
@@ -211,6 +214,7 @@ void fillHeight(JpgData jDat, int nEdges); // extends the height of the image
 void loadCoordinates(Coordinate *c); // loads co-ordinates that indicate the order in which the quan coefficients should be analysed
 void sanitise(symbol *s); // removes random ZRL and places the EOB in the correct position
 int numOfBits(int x); // determines the # bits required to represent a number x
+char *intToHuffBits(int x); // convert an integer into huffman bits
 
 // free resources
 void disposeJpgData(JpgData jdat);
@@ -250,6 +254,18 @@ static const int quanMatrixChr[QUAN_MAT_SIZE][QUAN_MAT_SIZE] = {{17, 18, 24, 47,
 														  {99, 99, 99, 99, 99, 99, 99, 99},
 														  {99, 99, 99, 99, 99, 99, 99, 99},
 														  {99, 99, 99, 99, 99, 99, 99, 99}};
+
+// default huffman tables taken from the spec
+static const unsigned char DCLumHuffTable[7] = {19, 151, 119, 190, 253, 253, 254};
+static const int numBitsDCLum[12] = {2, 3, 3, 3, 3, 3, 4, 5, 6, 7, 8, 9}; // index = # bits to represent, values = how far to search the huffman table above to get the rep
+
+// 00010011  = 19 | 10010111 = 151 | 01110111 = 119 | 10111110 = 190 | 11111101 = 253 | 11111101 = 253 | 11111110 = 254 (LUM, DC)
+static const unsigned char DCChromHuffTable[9] = {27, 119, 190, 253, 253, 254, 255, 191, 240};
+static const int numBitsDCChrom[12] = {2, 2, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
+// 00011011  = 27 | 01110111 = 119 | 10111110 = 190 | 11111101 = 253 | 11111101 = 253 | 11111110 = 254 | 11111111 = 255 | 10111111 = 191 | 11110 = 240
+
+static const long unsigned int ACLumHuffTable[]
+
 
 // can easily be adapted to other image formats other than BMP - mainly used for testing
 Pixel imageToRGB(const char *imageName, int *bufSize)

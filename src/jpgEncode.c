@@ -62,6 +62,7 @@
 	* http://users.ece.utexas.edu/~ryerraballi/MSB/pdfs/M4L1.pdf -> DPCM and Run length encoding
 	* http://www.impulseadventure.com/photo/jpeg-huffman-coding.html -> Huffman encoding
 	* http://www.cs.cf.ac.uk/Dave/MM/BSC_MM_CALLER/PDF/10_CM0340_JPEG.pdf -> good overview of jpeg
+	* http://www.ctralie.com/PrincetonUGRAD/Projects/JPEG/jpeg.pdf -> mainly for decoding but also helps with encoding
 
 	Algorithm: Quantization quality factor
 	1 < Q < 100 ( quality range );
@@ -85,6 +86,12 @@ typedef struct _symbol{
 	unsigned char s1; // symbol 1: runlength (4 bits) | size (4 bits)
 	int s2; // synbol 2: amplitude
 } symbol;
+
+typedef struct _huffSymbol{
+	int nBits; // number of bits to write to the file
+	uint32_t bits; // huffman encoded bits
+} huffSymbol;
+
 
 typedef struct _jpegData{
 	// YCbCr data
@@ -114,15 +121,9 @@ typedef struct _jpegData{
 	symbol **encodeCb;
 	symbol **encodeCr;
 
-	// AC huffman encoding
-	char **huffmanAcY;
-	char **huffmanAcCb;
-	char **huffmanAcCr;
-
-	// DC huffman encoding
-	char **huffmanDcY;
-	char **huffmanDcCb;
-	char **huffmanDcCr;
+	huffSymbol **huffmanY;
+	huffSymbol **huffmanCb;
+	huffSymbol **huffmanCr;
 	
 	// common image properties
 	unsigned int width;
@@ -188,8 +189,6 @@ void dpcm(JpgData jDat); // encodes the DC values (upper-left values in the tabl
 /*
 	Run Length Coding
 	Compresses the AC values in the zig-zag vector. This is applied to the 1x63 vector.
-	Input: 
-	Output:
 */
 void runLength(JpgData jDat); // encodes the AC values in the block (the other values)
 
@@ -225,6 +224,13 @@ void loadCoordinates(Coordinate *c); // loads co-ordinates that indicate the ord
 void sanitise(symbol *s); // removes random ZRL and places the EOB in the correct position
 int numOfBits(int x); // determines the # bits required to represent a number x
 char *intToHuffBits(int x); // convert an integer into huffman bits
+
+// utility functions for the huffman encoding process
+void DCHuffmanEncodeLum(symbol encodedDC, huffSymbol *block);
+void ACHuffmanEncodeLum(symbol *encodedBlock, huffSymbol *block);
+void DCHuffmanEncodeChrom(symbol encodedDC, huffSymbol *block);
+void ACHuffmanEncodeChrom(symbol *encodedBlock, huffSymbol *block);
+void huffmanEncodeValue(huffSymbol *block, int value, int bitPos);
 
 // free resources
 void disposeJpgData(JpgData jdat);
@@ -1047,9 +1053,65 @@ void loadCoordinates(Coordinate *c)
 // applies the huffman algorithm to compress the run length data + the DCT coefficients
 void huffmanEncoding(JpgData jDat)
 {
+	int i = 0, n = 0;
+
+	n = jDat->numBlocks; // total number of blocks
+
+	// allocate memory to hold the huffman codes
+	jDat->huffmanY = malloc(sizeof(huffSymbol *) * n);
+	jDat->huffmanCb = malloc(sizeof(huffSymbol *) * n);
+	jDat->huffmanCr = malloc(sizeof(huffSymbol *) * n);
+
+	for (i = 0; i < n; i++){
+		jDat->huffmanY[i] = malloc(sizeof(huffSymbol) * NUM_COEFFICIENTS);
+		jDat->huffmanCb[i] = malloc(sizeof(huffSymbol) * NUM_COEFFICIENTS);
+		jDat->huffmanCr[i] = malloc(sizeof(huffSymbol) * NUM_COEFFICIENTS);
+	}
 	
+	// huffman encode the 1x64 vectors
+	for (i = 0; i < n; i++){
+		// huffman encode a Y block
+		DCHuffmanEncodeLum(jDat->encodeY[i][0], jDat->huffmanY[i]);
+		ACHuffmanEncodeLum(jDat->encodeY[i], jDat->huffmanY[i]);
+		
+		// huffman encode a Cb block
+		DCHuffmanEncodeChrom(jDat->encodeCb[i][0], jDat->huffmanCb[i]);
+		ACHuffmanEncodeChrom(jDat->encodeCb[i], jDat->huffmanCb[i]);
+
+		// huffman encode a Cr block
+		DCHuffmanEncodeChrom(jDat->encodeCr[i][0], jDat->huffmanCr[i]);
+		ACHuffmanEncodeChrom(jDat->encodeCr[i], jDat->huffmanCr[i]);
+	}
 }
 
+// applies huffman encoding to a luminance DC coefficient
+void DCHuffmanEncodeLum(symbol encodedDC, huffSymbol *block)
+{
+	printf("Not implemented yet buddy.\n");
+}
+
+// applies huffman encoding to luminance AC coefficients
+void ACHuffmanEncodeLum(symbol *encodedBlock, huffSymbol *block)
+{
+	printf("Not implemented yet buddy.\n");
+}
+
+// huffman encodes a chrominance DC coefficient
+void DCHuffmanEncodeChrom(symbol encodedDC, huffSymbol *block)
+{
+	printf("Not implemented yet bud.\n");
+}
+
+// huffman encodes chrominance AC coefficients
+void ACHuffmanEncodeChrom(symbol *encodedBlock, huffSymbol *block)
+{
+	printf("Not implemented yet bud.\n");
+}
+
+void huffmanEncodeValue(huffSymbol *block, int value, int bitPos)
+{
+	printf("Not yet implemented.\n");
+}
 
 // free resources
 void disposeJpgData(JpgData jdata)
@@ -1074,6 +1136,9 @@ void disposeJpgData(JpgData jdata)
 		free(jdata->encodeY[i]);
 		free(jdata->encodeCb[i]);
 		free(jdata->encodeCr[i]);
+		free(jdata->huffmanY[i]);
+		free(jdata->huffmanCb[i]);
+		free(jdata->huffmanCr[i]);
 	}
 	
 	free(jdata->YBlocks);
@@ -1088,6 +1153,9 @@ void disposeJpgData(JpgData jdata)
 	free(jdata->encodeY);
 	free(jdata->encodeCb);
 	free(jdata->encodeCr);
+	free(jdata->huffmanY);
+	free(jdata->huffmanCb);
+	free(jdata->huffmanCr);
 	// free the whole struct
 	free(jdata);
 }

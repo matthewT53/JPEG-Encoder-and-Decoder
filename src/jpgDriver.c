@@ -7,7 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "headers/jpgEncode.h"
+#include "include/jpgEncode.h"
 
 int main(void)
 {

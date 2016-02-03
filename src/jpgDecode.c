@@ -7,4 +7,4 @@
 
 #include <stdio.h>
 
-#include "headers/jpgDecode.h"
+#include "include/jpgDecode.h"

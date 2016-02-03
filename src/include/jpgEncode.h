@@ -10,7 +10,7 @@
 typedef unsigned char Colour;
 typedef struct _pixel *Pixel;
 typedef struct _jpegData *JpgData;
-typedef char Byte;
+typedef unsigned char Byte;
 
 typedef struct _pixel{ // RGB pixel
 	Colour r; // red

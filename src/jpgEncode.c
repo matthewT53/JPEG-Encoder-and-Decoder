@@ -12,7 +12,8 @@
 #include <math.h>
 #include <assert.h>
 
-#include "headers/jpgEncode.h"
+#include "include/jpgEncode.h"
+#include "include/tables.h"
 
 // boolean constants
 #define TRUE 1
@@ -63,6 +64,7 @@
 	* http://www.impulseadventure.com/photo/jpeg-huffman-coding.html -> Huffman encoding
 	* http://www.cs.cf.ac.uk/Dave/MM/BSC_MM_CALLER/PDF/10_CM0340_JPEG.pdf -> good overview of jpeg
 	* http://www.ctralie.com/PrincetonUGRAD/Projects/JPEG/jpeg.pdf -> mainly for decoding but also helps with encoding
+	* https://www.opennet.ru/docs/formats/jpeg.txt -> good overview
 
 	Algorithm: Quantization quality factor
 	1 < Q < 100 ( quality range );
@@ -75,7 +77,6 @@
 
 	Things to do:
 	* add down sampling (might need to), current setting is 4:4:4
-	* add support for quality scaling (user specifies a quality)
 	* store the quantisation table inside jDat
 	* instead of freeing everything at once, free resources when we no longer require them
 	
@@ -87,11 +88,11 @@ typedef struct _symbol{
 	int s2; // synbol 2: amplitude
 } symbol;
 
+// represent huffman encoded bitstream for each DC and AC coefficient
 typedef struct _huffSymbol{
 	int nBits; // number of bits to write to the file
 	uint32_t bits; // huffman encoded bits
 } huffSymbol;
-
 
 typedef struct _jpegData{
 	// YCbCr data
@@ -251,72 +252,6 @@ static int determineFileSize(FILE *f); // determines the size of a file
 static void dbg_out_file(Pixel p, int size); // dumps the contents of buf into a file 
 #endif
 
-// default jpeg quantization matrix for 50% quality (luminance)
-static const int quanMatrixLum[QUAN_MAT_SIZE][QUAN_MAT_SIZE] = {{16, 11, 10, 16, 24, 40, 51, 61},	
-														 {12, 12, 14, 19, 26, 58, 60, 55}, 
-														 {14, 13, 16, 24, 40, 57, 69, 56}, 
-														 {14, 17, 22, 29, 51, 87, 80, 62},
-														 {18, 22, 37, 56, 68, 109, 103, 77}, 
-														 {24, 35, 55, 64, 81, 104, 113, 92}, 
-														 {49, 64, 78, 87, 103, 121, 120, 101},
-														 {72, 92, 95, 98, 112, 100, 103, 99}};
-
-// quan matrix for chrominance
-static const int quanMatrixChr[QUAN_MAT_SIZE][QUAN_MAT_SIZE] = {{17, 18, 24, 47, 99, 99, 99, 99},
-														  {18, 21, 26, 66, 99, 99, 99, 99},
-														  {24, 26, 56, 99, 99, 99, 99, 99},
-														  {47, 66, 99, 99, 99, 99, 99, 99},
-														  {99, 99, 99, 99, 99, 99, 99, 99}, 
-														  {99, 99, 99, 99, 99, 99, 99, 99},
-														  {99, 99, 99, 99, 99, 99, 99, 99},
-														  {99, 99, 99, 99, 99, 99, 99, 99}};
-
-// default huffman tables taken from the spec
-static const uint8_t DCLumHuffTable[7] = {19, 151, 119, 190, 253, 253, 254};
-static const int numBitsDCLum[12] = {2, 3, 3, 3, 3, 3, 4, 5, 6, 7, 8, 9}; // index = # bits to represent, values = how far to search the huffman table above to get the rep
-
-static const uint8_t DCChromHuffTable[9] = {27, 119, 190, 253, 253, 254, 255, 191, 240};
-static const int numBitsDCChrom[12] = {2, 2, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
-
-static const uint64_t ACLumHuffTable[36] = {11643967909800705047U, 18167080885398765506U, 9206201803425972164U, 8351916709912289272U, 12680095826223620088U, 17203469015664557857U, 18384818642516180777U, 18387036134131498799U, 18388759352320589623U, 18391011186171445199U, 9209861033958637521U, 9210423992502123519U, 8068884804067299322U, 11527719687705776122U, 16118374268907007999U, 12754108381514413055U, 13042343141967986614U, 18426477570439118778U, 18427603487526092031U, 16104837082576314623U, 16248954469708980991U, 16392750739777273842U, 9219642437577949171U, 9219923916844170511U, 18239575398427917647U, 18257590071819500943U, 17005425064700506111U, 8358531372603637759U, 9511470456577818609U, 18442944105688563699U, 18443507064232050677U, 18444070022775537655U, 18444632981319024633U, 18445195549010296687U, 18410714795647958959U, 18428729469039542240U};
-
-static const int numBitsAcLum[16][11] = { {4, 2, 2, 3, 4, 5, 7, 8, 10, 16, 16},
-										  {0, 4, 5, 7, 9, 11, 16, 16, 16, 16, 16},
-										  {0, 5, 8, 10, 12, 16, 16, 16, 16, 16, 16},
-										  {0, 6, 9, 12, 16, 16, 16, 16, 16, 16, 16},
-					                      {0, 6, 10, 16, 16, 16, 16, 16, 16, 16, 16},
-										  {0, 7, 11, 16, 16, 16, 16, 16, 16, 16, 16},
-										  {0, 7, 12, 16, 16, 16, 16, 16, 16, 16, 16},
-										  {0, 8, 12, 16, 16, 16, 16, 16, 16, 16, 16},
-                                  		  {0, 9, 15, 16, 16, 16, 16, 16, 16, 16, 16},
-                                          {0, 9, 16, 16, 16, 16, 16, 16, 16, 16, 16},
-                                          {0, 9, 16, 16, 16, 16, 16, 16, 16, 16, 16},
-                                          {0, 10, 16, 16, 16, 16, 16, 16, 16, 16, 16}, 
-                                          {0, 10, 16, 16, 16, 16, 16, 16, 16, 16, 16},
-                                          {0, 11, 16, 16, 16, 16, 16, 16, 16, 16, 16},
-                                          {0, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16},
-                                          {11, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16} };
-
-static const uint64_t ACChromHuffTable[36] = {1826437377705359354U, 6863168485266997233U, 2301691190492363511U, 18302589295027578876U, 8069456558703806206U, 4580152023097250559U, 10664406268090750699U, 17149478679152112639U, 3890890172400614399U, 4458550433735983615U, 4899711882329278975U, 5476181330666443775U, 15312191453346649599U, 15456308840478998303U, 17726157275489367647U, 17762186622272534239U, 4609152705518583799U, 6915136454368149495U, 16138648714860297247U, 18172020373209480287U, 18190035046601050110U, 5764141323124631550U, 8070019517247293438U, 10369537368914919251U, 18399455573237038947U, 18403959241426581503U, 13402637723156594687U, 13979107271687260158U, 9221472052844281849U, 18445125568970801146U, 18445406934425010158U, 18442240409656754162U, 18443366326743727807U, 16285011304702278783U, 18230568542783143551U, 18374685380159995904U};
-
-static const int numBitsAcChrom[16][11] = { {2, 2, 3, 4, 5, 5, 6, 7, 9, 10, 12},
-                                            {0, 4, 6, 8, 9, 11, 12, 16, 16, 16, 16},
-                                            {0, 5, 8, 10, 12, 15, 16, 16, 16, 16, 16},            
-                                            {0, 5, 8, 10, 12, 16, 16, 16, 16, 16, 16},
-                                            {0, 6, 9, 16, 16, 16, 16, 16, 16, 16, 16},
-                                            {0, 6, 10, 16, 16, 16, 16, 16, 16, 16, 16},
-                                            {0, 7, 11, 16, 16, 16, 16, 16, 16, 16, 16},
-                                            {0, 7, 11, 16, 16, 16, 16, 16, 16, 16, 16},
-                                            {0, 8, 16, 16, 16, 16, 16, 16, 16, 16, 16},
-                                            {0, 9, 16, 16, 16, 16, 16, 16, 16, 16, 16}, 
-                                            {0, 9, 16, 16, 16, 16, 16, 16, 16, 16, 16},
-                                            {0, 9, 16, 16, 16, 16, 16, 16, 16, 16, 16},
-                                            {0, 9, 16, 16, 16, 16, 16, 16, 16, 16, 16},
-                                            {0, 11, 16, 16, 16, 16, 16, 16, 16, 16, 16},
-                                            {0, 14, 16, 16, 16, 16, 16, 16, 16, 16, 16},
-                                            {10, 15, 16, 16, 16, 16, 16, 16, 16, 16, 16} };
-
-
 // can easily be adapted to other image formats other than BMP - mainly used for testing
 Pixel imageToRGB(const char *imageName, int *bufSize)
 {
@@ -342,13 +277,6 @@ Pixel imageToRGB(const char *imageName, int *bufSize)
 	if (bytesRead <= 0) { printf("Error reading from file.\n"); }
 	// is the code above dangerous???
 	*bufSize = numberPixels; // set the size of the buffer
-
-	// O(n) copy since there is padding in the Pixel DAT struct
-	/*for (i = 0; j < imageSize; i++){
-		pixBuf[i].r = pBuf[j++]; // set the red
-		pixBuf[i].g = pBuf[j++]; // set the green
-		pixBuf[i].b = pBuf[j++]; // j % 3 == 2 // set the blue
-	}*/
 	
 	#ifdef DEBUG
 		dbg_out_file(pixBuf, numberPixels);
@@ -1087,7 +1015,8 @@ void huffmanEncoding(JpgData jDat)
 // applies huffman encoding to a luminance DC coefficient
 void DCHuffmanEncodeLum(symbol encodedDC, huffSymbol *block)
 {
-	printf("Not implemented yet buddy.\n");
+	
+
 }
 
 // applies huffman encoding to luminance AC coefficients

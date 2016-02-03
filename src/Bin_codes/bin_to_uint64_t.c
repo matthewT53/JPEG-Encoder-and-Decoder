@@ -34,6 +34,9 @@ static const uint64_t ACChromHuffTable[36] = {1826437377705359354U, 686316848526
 int main(int argc, char **argv)
 {
 	char *infile = NULL, *outfile = NULL;
+	uint32_t bit = 1;
+	bit <<= 31;
+	printf("bit = %u\n", bit);
 	if (argc != 2){
 		usage();
 		exit(1); 
@@ -41,7 +44,6 @@ int main(int argc, char **argv)
 
 	// get the names of the files from the stdin
 	infile = argv[1];
-	
 	convert(infile);
 	printf("\n");
 	backToBin(ACChromHuffTable, 36);

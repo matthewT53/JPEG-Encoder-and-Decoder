@@ -83,16 +83,16 @@
 */
 
 // run length encoding as shown on wikipedia
-typedef struct _symbol{
-	unsigned char s1; // symbol 1: runlength (4 bits) | size (4 bits)
+typedef struct _Symbol{
+	unsigned char s1; // Symbol 1: runlength (4 bits) | size (4 bits)
 	int s2; // synbol 2: amplitude
-} symbol;
+} Symbol;
 
 // represent huffman encoded bitstream for each DC and AC coefficient
-typedef struct _huffSymbol{
+typedef struct _HuffSymbol{
 	int nBits; // number of bits to write to the file
 	uint32_t bits; // huffman encoded bits
-} huffSymbol;
+} HuffSymbol;
 
 typedef struct _jpegData{
 	// YCbCr data
@@ -118,13 +118,13 @@ typedef struct _jpegData{
 	int **zzCr;
 
 	// encoding stuff
-	symbol **encodeY;
-	symbol **encodeCb;
-	symbol **encodeCr;
+	Symbol **encodeY;
+	Symbol **encodeCb;
+	Symbol **encodeCr;
 
-	huffSymbol **huffmanY;
-	huffSymbol **huffmanCb;
-	huffSymbol **huffmanCr;
+	HuffSymbol **huffmanY;
+	HuffSymbol **huffmanCb;
+	HuffSymbol **huffmanCr;
 	
 	// common image properties
 	unsigned int width;
@@ -222,16 +222,16 @@ void fillWidth(JpgData jDat, int nEdges); // extends the width of the image
 void fillHeight(JpgData jDat, int nEdges); // extends the height of the image
 
 void loadCoordinates(Coordinate *c); // loads co-ordinates that indicate the order in which the quan coefficients should be analysed
-void sanitise(symbol *s); // removes random ZRL and places the EOB in the correct position
+void sanitise(Symbol *s); // removes random ZRL and places the EOB in the correct position
 int numOfBits(int x); // determines the # bits required to represent a number x
 char *intToHuffBits(int x); // convert an integer into huffman bits
 
 // utility functions for the huffman encoding process
-void DCHuffmanEncodeLum(symbol encodedDC, huffSymbol *block);
-void ACHuffmanEncodeLum(symbol *encodedBlock, huffSymbol *block);
-void DCHuffmanEncodeChrom(symbol encodedDC, huffSymbol *block);
-void ACHuffmanEncodeChrom(symbol *encodedBlock, huffSymbol *block);
-void huffmanEncodeValue(huffSymbol *block, int value, int bitPos);
+void DCHuffmanEncodeLum(Symbol encodedDC, HuffSymbol *block);
+void ACHuffmanEncodeLum(Symbol *encodedBlock, HuffSymbol *block);
+void DCHuffmanEncodeChrom(Symbol encodedDC, HuffSymbol *block);
+void ACHuffmanEncodeChrom(Symbol *encodedBlock, HuffSymbol *block);
+void huffmanEncodeValue(HuffSymbol *block, int value, int bitPos);
 
 // free resources
 void disposeJpgData(JpgData jdat);
@@ -742,16 +742,16 @@ void dpcm(JpgData jDat)
 	int i = 0;
 
 	// allocate memory to store the encoded data
-	jDat->encodeY = malloc(sizeof(symbol *) * jDat->numBlocks);
-	jDat->encodeCb = malloc(sizeof(symbol *) * jDat->numBlocks);
-	jDat->encodeCr = malloc(sizeof(symbol *) * jDat->numBlocks);
+	jDat->encodeY = malloc(sizeof(Symbol *) * jDat->numBlocks);
+	jDat->encodeCb = malloc(sizeof(Symbol *) * jDat->numBlocks);
+	jDat->encodeCr = malloc(sizeof(Symbol *) * jDat->numBlocks);
 
 	assert(jDat->encodeY != NULL && jDat->encodeCb != NULL && jDat->encodeCr != NULL);
 	
 	for (i = 0; i < jDat->numBlocks; i++){
-		jDat->encodeY[i] = calloc(NUM_COEFFICIENTS, sizeof(symbol));
-		jDat->encodeCb[i] = calloc(NUM_COEFFICIENTS, sizeof(symbol));
-		jDat->encodeCr[i] = calloc(NUM_COEFFICIENTS, sizeof(symbol));
+		jDat->encodeY[i] = calloc(NUM_COEFFICIENTS, sizeof(Symbol));
+		jDat->encodeCb[i] = calloc(NUM_COEFFICIENTS, sizeof(Symbol));
+		jDat->encodeCr[i] = calloc(NUM_COEFFICIENTS, sizeof(Symbol));
 		assert(jDat->encodeY[i] != NULL && jDat->encodeCb[i] != NULL && jDat->encodeCr[i] != NULL);
 	}
 
@@ -794,10 +794,10 @@ void runLength(JpgData jDat)
 		for (j = 1; j < NUM_COEFFICIENTS; j++){ // skip the DC coefficient and process the AC coefs
 			if (jDat->zzY[i][j] != 0 || z1 == MAX_ZEROES){
 				if (z1 == MAX_ZEROES){ 
-					jDat->encodeY[i][k1].s1 |= ZRL_VALUE; // add the # zeroes in the correct part of the symbol
+					jDat->encodeY[i][k1].s1 |= ZRL_VALUE; // add the # zeroes in the correct part of the Symbol
 				}
 				else { jDat->encodeY[i][k1].s1 |= z1; }
-				jDat->encodeY[i][k1].s1 <<= 4; // shift by 4 bits to put the #zeroes in the run length part of the symbol
+				jDat->encodeY[i][k1].s1 <<= 4; // shift by 4 bits to put the #zeroes in the run length part of the Symbol
 				jDat->encodeY[i][k1].s1 |= (unsigned char) numOfBits(jDat->zzY[i][j]);
 				jDat->encodeY[i][k1].s2 = jDat->zzY[i][j]; // don't forget about the amplitude
 				z1 = 0;
@@ -810,10 +810,10 @@ void runLength(JpgData jDat)
 
 			if (jDat->zzCb[i][j] != 0 || z2 == MAX_ZEROES){
 				if (z2 == MAX_ZEROES){ 
-					jDat->encodeCb[i][k2].s1 |= ZRL_VALUE; // add the # zeroes in the correct part of the symbol
+					jDat->encodeCb[i][k2].s1 |= ZRL_VALUE; // add the # zeroes in the correct part of the Symbol
 				}
 				else { jDat->encodeCb[i][k2].s1 |= z2; }
-				jDat->encodeCb[i][k2].s1 <<= 4; // shift by 4 bits to put the #zeroes in the run length part of the symbol
+				jDat->encodeCb[i][k2].s1 <<= 4; // shift by 4 bits to put the #zeroes in the run length part of the Symbol
 				jDat->encodeCb[i][k2].s1 |= (unsigned char) numOfBits(jDat->zzCb[i][j]);
 				jDat->encodeCb[i][k2].s2 = jDat->zzCb[i][j]; // don't forget about the amplitude
 				z2 = 0;
@@ -826,10 +826,10 @@ void runLength(JpgData jDat)
 
 			if (jDat->zzCr[i][j] != 0 || z3 == MAX_ZEROES){
 				if (z3 == MAX_ZEROES){ 
-					jDat->encodeCr[i][k3].s1 |= ZRL_VALUE; // add the # zeroes in the correct part of the symbol
+					jDat->encodeCr[i][k3].s1 |= ZRL_VALUE; // add the # zeroes in the correct part of the Symbol
 				}
 				else { jDat->encodeCr[i][k3].s1 |= z3; }
-				jDat->encodeCr[i][k3].s1 <<= 4; // shift by 4 bits to put the #zeroes in the run length part of the symbol
+				jDat->encodeCr[i][k3].s1 <<= 4; // shift by 4 bits to put the #zeroes in the run length part of the Symbol
 				jDat->encodeCr[i][k3].s1 |= (unsigned char) numOfBits(jDat->zzCr[i][j]);
 				jDat->encodeCr[i][k3].s2 = jDat->zzCr[i][j]; // don't forget about the amplitude
 				z3 = 0;
@@ -865,7 +865,7 @@ void runLength(JpgData jDat)
 }
 
 // removes incorrect ZRLs and assigns EOB to the correct position
-void sanitise(symbol *s)
+void sanitise(Symbol *s)
 {
 	int i = 0;
 	for (i = NUM_COEFFICIENTS - 1; i >= 1; i--){
@@ -986,14 +986,14 @@ void huffmanEncoding(JpgData jDat)
 	n = jDat->numBlocks; // total number of blocks
 
 	// allocate memory to hold the huffman codes
-	jDat->huffmanY = malloc(sizeof(huffSymbol *) * n);
-	jDat->huffmanCb = malloc(sizeof(huffSymbol *) * n);
-	jDat->huffmanCr = malloc(sizeof(huffSymbol *) * n);
+	jDat->huffmanY = malloc(sizeof(HuffSymbol *) * n);
+	jDat->huffmanCb = malloc(sizeof(HuffSymbol *) * n);
+	jDat->huffmanCr = malloc(sizeof(HuffSymbol *) * n);
 
 	for (i = 0; i < n; i++){
-		jDat->huffmanY[i] = malloc(sizeof(huffSymbol) * NUM_COEFFICIENTS);
-		jDat->huffmanCb[i] = malloc(sizeof(huffSymbol) * NUM_COEFFICIENTS);
-		jDat->huffmanCr[i] = malloc(sizeof(huffSymbol) * NUM_COEFFICIENTS);
+		jDat->huffmanY[i] = malloc(sizeof(HuffSymbol) * NUM_COEFFICIENTS);
+		jDat->huffmanCb[i] = malloc(sizeof(HuffSymbol) * NUM_COEFFICIENTS);
+		jDat->huffmanCr[i] = malloc(sizeof(HuffSymbol) * NUM_COEFFICIENTS);
 	}
 	
 	// huffman encode the 1x64 vectors
@@ -1013,31 +1013,65 @@ void huffmanEncoding(JpgData jDat)
 }
 
 // applies huffman encoding to a luminance DC coefficient
-void DCHuffmanEncodeLum(symbol encodedDC, huffSymbol *block)
+void DCHuffmanEncodeLum(Symbol encodedDC, HuffSymbol *block)
 {
+	int bitsToSearch = 0;
+	int numBits = 0;
+	unsigned int rl = 0;
+	int bitSize = 0;
+	int codeIndex = 0, bitPos = 0;
+	int cb = 0;
+	int i = 0, j = 0;
+	uint8_t mask = 0;
+	uint32_t res = 0, bit = 0;
 	
+	bitSize = (int) encodedDC->s1;
 
+	for (i = 0; i < bitSize; i++){ // get the length of the # bits to pass until we reach the desired huffman code
+		bitsToSearch += numBitsDCLum[i];
+	}
+
+	codeIndex = bitsToSearch / 8; // get the index that the code will be in -> bit pos to start extracting from
+	bitPos = bitsToSearch % 8; // bit position to start extracting the bits from
+
+	numBits = numBitsDCLum[bitSize]; // tells us the # bits available for extraction in the current element
+	i = numBits;
+	j = 31;
+	while (i > 0){ // extract the bits
+		mask = 1;
+		mask <<= bitPos; // extract the correct bit pos
+		bit = (uint32_t) (DCLum_HuffCodes[codeIndex] & mask); // '1' or '0'
+		bit << j;
+		// check if we have to go to the next element
+		if (bitPos % 8 == 0) { bitPos = 0; codeIndex++; }
+		bitPos++;
+		i--;
+		j--;
+	}
+
+	// encode the value
+		
 }
 
 // applies huffman encoding to luminance AC coefficients
-void ACHuffmanEncodeLum(symbol *encodedBlock, huffSymbol *block)
+void ACHuffmanEncodeLum(Symbol *encodedBlock, HuffSymbol *block)
 {
 	printf("Not implemented yet buddy.\n");
 }
 
 // huffman encodes a chrominance DC coefficient
-void DCHuffmanEncodeChrom(symbol encodedDC, huffSymbol *block)
+void DCHuffmanEncodeChrom(Symbol encodedDC, HuffSymbol *block)
 {
 	printf("Not implemented yet bud.\n");
 }
 
 // huffman encodes chrominance AC coefficients
-void ACHuffmanEncodeChrom(symbol *encodedBlock, huffSymbol *block)
+void ACHuffmanEncodeChrom(Symbol *encodedBlock, HuffSymbol *block)
 {
 	printf("Not implemented yet bud.\n");
 }
 
-void huffmanEncodeValue(huffSymbol *block, int value, int bitPos)
+void huffmanEncodeValue(HuffSymbol *block, int value, int bitPos)
 {
 	printf("Not yet implemented.\n");
 }

@@ -991,9 +991,9 @@ void huffmanEncoding(JpgData jDat)
 	jDat->huffmanCr = malloc(sizeof(HuffSymbol *) * n);
 
 	for (i = 0; i < n; i++){
-		jDat->huffmanY[i] = malloc(sizeof(HuffSymbol) * NUM_COEFFICIENTS);
-		jDat->huffmanCb[i] = malloc(sizeof(HuffSymbol) * NUM_COEFFICIENTS);
-		jDat->huffmanCr[i] = malloc(sizeof(HuffSymbol) * NUM_COEFFICIENTS);
+		jDat->huffmanY[i] = calloc(NUM_COEFFICIENTS, sizeof(HuffSymbol));
+		jDat->huffmanCb[i] = calloc(NUM_COEFFICIENTS, sizeof(HuffSymbol));
+		jDat->huffmanCr[i] = calloc(NUM_COEFFICIENTS, sizeof(HuffSymbol));
 	}
 	
 	// huffman encode the 1x64 vectors
@@ -1041,7 +1041,8 @@ void DCHuffmanEncodeLum(Symbol encodedDC, HuffSymbol *block)
 		mask = 1;
 		mask <<= bitPos; // extract the correct bit pos
 		bit = (uint32_t) (DCLum_HuffCodes[codeIndex] & mask); // '1' or '0'
-		bit << j;
+		bit <<= j;
+		res |= bit;
 		// check if we have to go to the next element
 		if (bitPos % 8 == 0) { bitPos = 0; codeIndex++; }
 		bitPos++;
@@ -1049,8 +1050,11 @@ void DCHuffmanEncodeLum(Symbol encodedDC, HuffSymbol *block)
 		j--;
 	}
 
+	block[0].nBits = numBits;
+	block[0].bits = res;
+	
 	// encode the value
-		
+	huffmanEncodeValue(block, encodedDC.s2, bitSize);
 }
 
 // applies huffman encoding to luminance AC coefficients
@@ -1071,9 +1075,58 @@ void ACHuffmanEncodeChrom(Symbol *encodedBlock, HuffSymbol *block)
 	printf("Not implemented yet bud.\n");
 }
 
-void huffmanEncodeValue(HuffSymbol *block, int value, int bitPos)
+void huffmanEncodeValue(HuffSymbol huffCoeff, int value, int bitSize)
 {
-	printf("Not yet implemented.\n");
+	int bitPos = 0;
+	int i = 0, j = 0;
+	uint32_t bit = 0, mask = 0, minValue = 0, additionalBits = 0;
+	uint32_t bit2 = 0, mask2 = 0, bitsToClear = 0, bitsToAdd = 0;
+	
+	minValue = ((uint32_t) pow(2, bitSize)) * (-1);
+	// determine the "additional bits" associated with the value
+	mask = 1;
+	while (minValue < value){ // loop until additional bits represents our value
+		bit = additionalBits & mask; // extract rightmost bit
+		if (bit == 1){
+			// shift the leftmost '1' from the right left and clear everything behind it
+			mask2 = 1;
+			bit2 = additionalBits & mask2;
+			i = 0;
+			while (bit2){ // loop until a '0' bit is reached
+				i++; 
+				mask2 <<= 1;
+				bit2 = additionalBits & mask2;
+			}
+			bitsToClear = (uint32_t) pow(2, i);
+			bitsToAdd = (uint32_t) pow(2, i + 1);
+			additionalBits -= bitsToClear;
+			additionalBits += bitsToAdd;
+		}
+
+		else if (bit == 0){
+			// make the rightmost bit a '1'
+			additionaBits |= mask;
+		}
+
+		else{
+			printf("Error: Bit is neither 1 nor 0.\n");
+		}
+		
+		minValue++;
+	}	
+
+	// copy the additional bits into huffCoeff
+	bitPos = huffCoeff.numBits;
+	i = bitSize - 1;
+	while (i > 0){
+		mask = 1;
+		mask <<= i;
+		bit = additionalBits & mask;
+		bit <<= (32 - bitPos);
+		huffCoeff.bits |= bit;
+		i--;
+	}
+	huffCoeff.nBits += bitSize;
 }
 
 // free resources

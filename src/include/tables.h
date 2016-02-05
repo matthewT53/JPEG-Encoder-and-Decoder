@@ -9,6 +9,8 @@
 
 #include <stdint.h>
 
+#define QUAN_MAT_SIZE 8
+
 // default jpeg quantization matrix for 50% quality (luminance)
 static const int quanMatrixLum[QUAN_MAT_SIZE][QUAN_MAT_SIZE] = {{16, 11, 10, 16, 24, 40, 51, 61},	
 														 {12, 12, 14, 19, 26, 58, 60, 55}, 
@@ -142,7 +144,20 @@ static const int numBitsAcChr[16][11] = { {2, 2, 3, 4, 5, 5, 6, 7, 9, 10, 12},
                                             {0, 14, 16, 16, 16, 16, 16, 16, 16, 16, 16},
                                             {10, 15, 16, 16, 16, 16, 16, 16, 16, 16, 16} };
 
+// code o debug the tables
+/*
+uint8_t bit8 = 0;
+		printf("Printing luminance table: \n");
+		for (i = 0; i < 7; i++){
+			for (j = 7; j >= 0; j--){
+				mask = 1;
+				mask <<= j;
+				bit8 = mask & DCLum_HuffCodes[i];
+				printf("%d", (bit8) ? 1 : 0);
+			}
+			printf("\n");
+		}
 
-
+*/
 
 #endif

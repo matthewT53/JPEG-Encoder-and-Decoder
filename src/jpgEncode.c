@@ -25,7 +25,6 @@
 
 // quan matrix constants
 #define BLOCK_SIZE 8
-#define QUAN_MAT_SIZE 8
 #define DEFAULT_QUALITY 50
 
 // zig-zag stuff
@@ -43,6 +42,7 @@
 #define DEBUG_ZZ // debugging constant for zig-zag process
 #define DEBUG_DPCM // debugging constant for DPCM process
 #define DEBUG_RUN // debugging constant for run length coding
+#define DEBUG_HUFFMAN // debugging constant for huffman encoding
 
 // #define LEVEL_SHIFT
 
@@ -231,7 +231,7 @@ void DCHuffmanEncodeLum(Symbol encodedDC, HuffSymbol *block);
 void ACHuffmanEncodeLum(Symbol *encodedBlock, HuffSymbol *block);
 void DCHuffmanEncodeChrom(Symbol encodedDC, HuffSymbol *block);
 void ACHuffmanEncodeChrom(Symbol *encodedBlock, HuffSymbol *block);
-void huffmanEncodeValue(HuffSymbol *block, int value, int bitPos);
+void huffmanEncodeValue(HuffSymbol *huffCoeff, int value, int bitSize);
 
 // free resources
 void disposeJpgData(JpgData jdat);
@@ -759,6 +759,12 @@ void dpcm(JpgData jDat)
 	jDat->encodeY[0][0].s2 = jDat->zzY[0][0];
 	jDat->encodeCb[0][0].s2 = jDat->zzCb[0][0];
 	jDat->encodeCr[0][0].s2 = jDat->zzCr[0][0];
+	
+	// determine the # bits for the very first DC coefficients in each block
+	jDat->encodeY[0][0].s1 |= (unsigned char) numOfBits(jDat->encodeY[0][0].s2);
+	jDat->encodeCb[0][0].s1 |= (unsigned char) numOfBits(jDat->encodeCb[0][0].s2);
+	jDat->encodeCr[0][0].s1 |= (unsigned char) numOfBits(jDat->encodeCr[0][0].s2);
+
 	for (curBlock = 1; curBlock < jDat->numBlocks; curBlock++){ // iterate in reverse to avoid incorrectly altering results of elements ahead
 		jDat->encodeY[curBlock][0].s2 = jDat->zzY[curBlock][0] - jDat->zzY[curBlock - 1][0];
 		jDat->encodeCb[curBlock][0].s2 = jDat->zzCb[curBlock][0] - jDat->zzCb[curBlock - 1][0];
@@ -998,6 +1004,9 @@ void huffmanEncoding(JpgData jDat)
 	
 	// huffman encode the 1x64 vectors
 	for (i = 0; i < n; i++){
+		#ifdef DEBUG_HUFFMAN
+			printf("Block number: %d\n", i + 1);
+		#endif
 		// huffman encode a Y block
 		DCHuffmanEncodeLum(jDat->encodeY[i][0], jDat->huffmanY[i]);
 		ACHuffmanEncodeLum(jDat->encodeY[i], jDat->huffmanY[i]);
@@ -1017,35 +1026,41 @@ void DCHuffmanEncodeLum(Symbol encodedDC, HuffSymbol *block)
 {
 	int bitsToSearch = 0;
 	int numBits = 0;
-	unsigned int rl = 0;
 	int bitSize = 0;
 	int codeIndex = 0, bitPos = 0;
-	int cb = 0;
 	int i = 0, j = 0;
 	uint8_t mask = 0;
 	uint32_t res = 0, bit = 0;
 	
-	bitSize = (int) encodedDC->s1;
-
+	bitSize = (int) encodedDC.s1;
 	for (i = 0; i < bitSize; i++){ // get the length of the # bits to pass until we reach the desired huffman code
 		bitsToSearch += numBitsDCLum[i];
 	}
 
 	codeIndex = bitsToSearch / 8; // get the index that the code will be in -> bit pos to start extracting from
-	bitPos = bitsToSearch % 8; // bit position to start extracting the bits from
+	bitPos = 7 - (bitsToSearch % 8); // bit position to start extracting the bits from
+
+	#ifdef DEBUG_HUFFMAN
+		printf("bitSize = %d\n", bitSize);
+		printf("Code index: %d and bitPos = %d\n", codeIndex, bitPos);
+	#endif 
 
 	numBits = numBitsDCLum[bitSize]; // tells us the # bits available for extraction in the current element
 	i = numBits;
+	#ifdef DEBUG_HUFFMAN
+		printf("numBits = %d\n", numBits);
+	#endif
 	j = 31;
-	while (i > 0){ // extract the bits
+	while (i > 0){ // extract the bits, bits are not alligned
 		mask = 1;
 		mask <<= bitPos; // extract the correct bit pos
 		bit = (uint32_t) (DCLum_HuffCodes[codeIndex] & mask); // '1' or '0'
+		bit = (bit) ? 1 : 0;
 		bit <<= j;
 		res |= bit;
 		// check if we have to go to the next element
-		if (bitPos % 8 == 0) { bitPos = 0; codeIndex++; }
-		bitPos++;
+		bitPos--;
+		if (bitPos < 0) { bitPos = 7; codeIndex++; }
 		i--;
 		j--;
 	}
@@ -1054,7 +1069,18 @@ void DCHuffmanEncodeLum(Symbol encodedDC, HuffSymbol *block)
 	block[0].bits = res;
 	
 	// encode the value
-	huffmanEncodeValue(block, encodedDC.s2, bitSize);
+	huffmanEncodeValue(&block[0], encodedDC.s2, bitSize);
+	#ifdef DEBUG_HUFFMAN
+		printf("Huffman encoded DC: ");
+		uint32_t mask2 = 0;
+		for (i = 32 - 1; i >= 0; i--){
+			mask2 = 1;
+			mask2 <<= i;
+			bit = block[0].bits & mask2;
+			printf("%d", (bit) ? 1 : 0);
+		}
+		printf("\n");
+	#endif
 }
 
 // applies huffman encoding to luminance AC coefficients
@@ -1075,16 +1101,25 @@ void ACHuffmanEncodeChrom(Symbol *encodedBlock, HuffSymbol *block)
 	printf("Not implemented yet bud.\n");
 }
 
-void huffmanEncodeValue(HuffSymbol huffCoeff, int value, int bitSize)
+// still screws up when value = 6
+void huffmanEncodeValue(HuffSymbol *huffCoeff, int value, int bitSize)
 {
-	int bitPos = 0;
-	int i = 0, j = 0;
-	uint32_t bit = 0, mask = 0, minValue = 0, additionalBits = 0;
+	int bitPos = 0, minValue = 0;
+	int i = 0;
+	uint32_t bit = 0, mask = 0, additionalBits = 0;
 	uint32_t bit2 = 0, mask2 = 0, bitsToClear = 0, bitsToAdd = 0;
 	
-	minValue = ((uint32_t) pow(2, bitSize)) * (-1);
+	if (value > 0){
+		minValue = (int) pow(2, bitSize - 1);
+		additionalBits |= (uint32_t) minValue;
+	}
+
+	else{
+		minValue = (int) pow(2, bitSize) * (-1) + 1;	
+	}
 	// determine the "additional bits" associated with the value
 	mask = 1;
+	printf("Size of value: %d and Min value: %d and value = %d\n", bitSize, minValue, value);
 	while (minValue < value){ // loop until additional bits represents our value
 		bit = additionalBits & mask; // extract rightmost bit
 		if (bit == 1){
@@ -1092,20 +1127,21 @@ void huffmanEncodeValue(HuffSymbol huffCoeff, int value, int bitSize)
 			mask2 = 1;
 			bit2 = additionalBits & mask2;
 			i = 0;
+			bitsToClear = 0;
 			while (bit2){ // loop until a '0' bit is reached
-				i++; 
 				mask2 <<= 1;
+				bitsToClear += (uint32_t) pow(2, i);
 				bit2 = additionalBits & mask2;
+				i++; 
 			}
-			bitsToClear = (uint32_t) pow(2, i);
-			bitsToAdd = (uint32_t) pow(2, i + 1);
+			bitsToAdd = (uint32_t) pow(2, i);
 			additionalBits -= bitsToClear;
 			additionalBits += bitsToAdd;
 		}
 
 		else if (bit == 0){
 			// make the rightmost bit a '1'
-			additionaBits |= mask;
+			additionalBits |= mask;
 		}
 
 		else{
@@ -1115,18 +1151,22 @@ void huffmanEncodeValue(HuffSymbol huffCoeff, int value, int bitSize)
 		minValue++;
 	}	
 
+	printf("Additionalbits = %u\n", additionalBits);
+
 	// copy the additional bits into huffCoeff
-	bitPos = huffCoeff.numBits;
+	bitPos = huffCoeff->nBits + 1;
 	i = bitSize - 1;
-	while (i > 0){
+	while (i >= 0){
 		mask = 1;
 		mask <<= i;
-		bit = additionalBits & mask;
+		bit = (additionalBits & mask) ? 1 : 0;
+		// printf("bit = %d\n", bit);
 		bit <<= (32 - bitPos);
-		huffCoeff.bits |= bit;
+		huffCoeff->bits |= bit;
 		i--;
+		bitPos++;
 	}
-	huffCoeff.nBits += bitSize;
+	huffCoeff->nBits += bitSize;
 }
 
 // free resources

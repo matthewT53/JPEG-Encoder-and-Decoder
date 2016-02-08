@@ -166,7 +166,7 @@ void dct(JpgData jDat);
 	
 	Output: Modified the jDat quan matrices
 */
-void quantise(JpgData jDat, double **dctY, double **dctCb, double **dctCr, int sx, int sy); // takes in one 8x8 DCT block and converts it to a quantised form
+void quantise(JpgData jDat, double dctY[][BLOCK_SIZE], double dctCb[][BLOCK_SIZE], double dctCr[][BLOCK_SIZE], int sx, int sy); // takes in one 8x8 DCT block and converts it to a quantised form
 
 // Zig-Zag ordering
 /*
@@ -239,7 +239,7 @@ void disposeJpgData(JpgData jdat);
 // utility functions for freeing resources
 void dispose_YCbCr(JpgData jDat); // frees the YCbCr arrays
 void dispose_blocks(JpgData jDat); // frees the 8x8 blocks
-void dispose_quan(JpgData jDat); // frees the quantiation matices for each component
+void dispose_quan(JpgData jDat); // frees the quantization matices for each component
 void dispose_zz(JpgData jDat); // frees the zig-zag vectors for each component
 void dispose_encode(JpgData jDat); // frees the encoded data for each component
 
@@ -526,7 +526,7 @@ void dct(JpgData jDat)
 	int curBlock = 0;
 	int startX = 0, endX = 0;
 	int startY = 0, endY = 0;
-	int *sX = NULL , *sY = NULL;
+	int sX[2] = {0}, sY[2] = {0};
 
 	// DCT coefficient
 	double dctYCoef = 0.0;
@@ -534,19 +534,9 @@ void dct(JpgData jDat)
 	double dctCrCoef = 0.0;
 
 	// create the dct 8x8 arrays
-	double **dctY = NULL;
-	double **dctCb = NULL;
-	double **dctCr = NULL;
-
-	dctY = malloc(sizeof(double *) * BLOCK_SIZE); // OPT: Don't need to dynamically allocate, just create an 8x8 array on the stack
-	dctCb = malloc(sizeof(double *) * BLOCK_SIZE);
-	dctCr = malloc(sizeof(double *) * BLOCK_SIZE);
-
-	for (i = 0; i < BLOCK_SIZE; i++){
-		dctY[i] = calloc(BLOCK_SIZE, sizeof(double));
-		dctCb[i] = calloc(BLOCK_SIZE, sizeof(double));
-		dctCr[i] = calloc(BLOCK_SIZE, sizeof(double));
-	}
+	double dctY[BLOCK_SIZE][BLOCK_SIZE]; // changed this from dynamic allocation
+	double dctCb[BLOCK_SIZE][BLOCK_SIZE];
+	double dctCr[BLOCK_SIZE][BLOCK_SIZE];
 
 	// create the quantization arrays
 	jDat->quanY = malloc(sizeof(int *) * jDat->totalHeight);
@@ -565,8 +555,6 @@ void dct(JpgData jDat)
 	#endif
 	// DCT main process: O(n^4) for each 8x8 block
 	for (curBlock = 1; curBlock <= jDat->numBlocks; curBlock++){ // apply it to every block in the image
-		sX = calloc(2, sizeof(int));
-		sY = calloc(2, sizeof(int));
 		blockToCoords(jDat, curBlock, sX, sY); // this function is seg faulting
 		startX = sX[0]; endX = sX[1]; // get the starting + ending x coordinates 
 		startY = sY[0]; endY = sY[1]; // get the starting + ending y coordinates
@@ -614,27 +602,13 @@ void dct(JpgData jDat)
 
 		// quantise the 8x8 block
 		quantise(jDat, dctY, dctCb, dctCr, startX, startY);
-		// free the coordinates array
-		free(sX);
-		free(sY);
-		sX = NULL;
-		sY= NULL;
-	}	
-
-	// free resources
-	for (i = 0; i < BLOCK_SIZE; i++){
-		free(dctY[i]);
-		free(dctCb[i]);
-		free(dctCr[i]);
+		sX[0] = sX[1] = 0;
+		sY[0] = sY[1] = 0;
 	}
-
-	free(dctY);
-	free(dctCb);
-	free(dctCr);
 }
 
 // quantises the image
-void quantise(JpgData jDat, double **dctY, double **dctCb, double **dctCr, int sx, int sy) // may have to modify for down sampling
+void quantise(JpgData jDat, double dctY[][BLOCK_SIZE], double dctCb[][BLOCK_SIZE], double dctCr[][BLOCK_SIZE], int sx, int sy) // may have to modify for down sampling
 {
 	int q = jDat->quality;
 	int s = 0;
@@ -681,16 +655,12 @@ void quantise(JpgData jDat, double **dctY, double **dctCb, double **dctCr, int s
 void zigZag(JpgData jDat)
 {
 	int i = 0, j = 0;
-	int *sX = NULL, *sY = NULL;
+	int sX[2] = {0}, sY[2] = {0};
 	int startX = 0, startY = 0;
 	int cX = 0, cY = 0;
 	int curBlock = 0;
 
-	Coordinate *c = malloc(sizeof(Coordinate) * NUM_COEFFICIENTS); // same here don't need to dynamically allocate
-
-	// get space to hold the starting coordinates for each block
-	sX = malloc(sizeof(int) * 2); // don't ned to dynamically allocate since the size is known
-	sY = malloc(sizeof(int) * 2);
+	Coordinate c[NUM_COEFFICIENTS];
 
 	jDat->zzY = malloc(sizeof(int *) * jDat->numBlocks);
 	jDat->zzCb = malloc(sizeof(int *) * jDat->numBlocks);
@@ -702,7 +672,6 @@ void zigZag(JpgData jDat)
 		jDat->zzCr[i] = calloc(NUM_COEFFICIENTS, sizeof(int));
 	} 
 
-	assert(sX != NULL && sY != NULL && c != NULL);
 	loadCoordinates(c);
 	// process earch block from the quantized matrices
 	for (curBlock = 1; curBlock <= jDat->numBlocks; curBlock++){
@@ -716,6 +685,8 @@ void zigZag(JpgData jDat)
 			jDat->zzCb[curBlock - 1][j] = jDat->quanCb[startY + cY][startX + cX];
 			jDat->zzCr[curBlock - 1][j] = jDat->quanCr[startY + cY][startX + cX];	
 		}
+		sX[0] = sX[1] = 0;
+		sY[0] = sY[1] = 0;
 	}
 
 	#ifdef DEBUG_ZZ
@@ -729,10 +700,6 @@ void zigZag(JpgData jDat)
 			printf("\n");
 		}
 	#endif
-
-	free(c);
-	free(sX);
-	free(sY);
 }
 
 // Maps a 8x8 block into a 1x64 vector
@@ -1086,22 +1053,77 @@ void DCHuffmanEncodeLum(Symbol encodedDC, HuffSymbol *block)
 // applies huffman encoding to luminance AC coefficients
 void ACHuffmanEncodeLum(Symbol *encodedBlock, HuffSymbol *block)
 {
-	printf("Not implemented yet buddy.\n");
+	int i = 0, j = 0;
+	int c = 0; // current coefficient
+	int codeIndex = 0, bitPos = 0;
+	int totalBits = 0, bitsToExtract = 0, numBits = 0;
+	int runL = 0, size = 0;
+
+	uint64_t mask = 0, bit = 0;
+	uint32_t res = 0;
+
+	for (c = 1; c < NUM_COEFFICIENTS; c++){ // loop through each coefficient
+		// extract the run length and the bit size
+		totalBits = 0;
+		runL = (int) encodedBlock[c].s1 >> 4;
+		size = (int) encodedBlock[c].s1 - (runL << 4);
+
+		if (!(runL == 0 && size == 0)){ // don't process the 0's after EOB
+			// calculate the # bits we have to loop through	
+			for (i = 0; i <= runL; i++){ // VERY INEFFICIENT, doesn't work
+				for (j = 0; j < size; j++){
+					totalBits += numBitsAcLum[i][j];
+				}
+			}
+
+			// now extract the correct huffman code to represent this value
+			codeIndex = totalBits / NUM_COEFFICIENTS;
+			bitPos = (NUM_COEFFICIENTS - 1) - (totalBits % NUM_COEFFICIENTS);
+			bitsToExtract = numBits = numBitsAcLum[runL][size]; // get the length of the huffman code
+			j = 31; // counter to keep track of the bits in the 32 bit storage space
+			while (bitsToExtract > 0){
+				mask = 1;
+				mask <<= bitPos;
+				bit = (mask & ACLum_HuffCodes[codeIndex]) ? 1 : 0; 
+				bit <<= j;
+				res |= (uint32_t) bit;
+				bitPos--;
+				if (bitPos < 0){ bitPos = NUM_COEFFICIENTS - 1; codeIndex++; }
+				j--;
+				bitsToExtract--;
+			}
+
+			block[c].nBits = numBits;
+			block[c].bits = res;
+			huffmanEncodeValue(&block[c], encodedBlock[c].s2, size);
+		}
+	}
+
+	#ifdef DEBUG_HUFFMAN
+	for (c = 1; c < NUM_COEFFICIENTS; c++){
+		res = block[c].bits;
+		printf("Coefficient: %2d : ", c);
+		for (i = 32- 1; i >= 0; i--){
+			mask = 1;
+			mask <<= i;
+			bit = mask & res;
+			printf("%d", (bit) ? 1 : 0);
+		}
+		printf("\n");
+	}
+	#endif
 }
 
-// huffman encodes a chrominance DC coefficient
 void DCHuffmanEncodeChrom(Symbol encodedDC, HuffSymbol *block)
 {
-	printf("Not implemented yet bud.\n");
+	printf("Not yet implemented.\n");
 }
 
-// huffman encodes chrominance AC coefficients
 void ACHuffmanEncodeChrom(Symbol *encodedBlock, HuffSymbol *block)
 {
-	printf("Not implemented yet bud.\n");
+	printf("Not yet implemented.\n");
 }
 
-// still screws up when value = 6
 void huffmanEncodeValue(HuffSymbol *huffCoeff, int value, int bitSize)
 {
 	int bitPos = 0, minValue = 0;
@@ -1151,7 +1173,7 @@ void huffmanEncodeValue(HuffSymbol *huffCoeff, int value, int bitSize)
 		minValue++;
 	}	
 
-	printf("Additionalbits = %u\n", additionalBits);
+	// printf("Additionalbits = %u\n", additionalBits);
 
 	// copy the additional bits into huffCoeff
 	bitPos = huffCoeff->nBits + 1;

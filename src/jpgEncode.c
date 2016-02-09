@@ -829,7 +829,7 @@ void runLength(JpgData jDat)
 			for (j = 1; j < NUM_COEFFICIENTS; j++){ 	
 				runL = jDat->encodeY[i][j].s1 >> 4;
 				size = jDat->encodeY[i][j].s1 - (runL << 4);
-				if (runL == 0 && jDat->encodeY[i][j].s2 == 0) { printf("EOB\n"); break; }
+				if (runL == 0 && size == 0 && jDat->encodeY[i][j].s2 == 0) { printf("EOB\n"); break; }
 				printf("([r = %d, s = %d], A = %d)\n", runL, size, jDat->encodeY[i][j].s2);
 			}
 			printf("\n");
@@ -1065,39 +1065,57 @@ void ACHuffmanEncodeLum(Symbol *encodedBlock, HuffSymbol *block)
 	for (c = 1; c < NUM_COEFFICIENTS; c++){ // loop through each coefficient
 		// extract the run length and the bit size
 		totalBits = 0;
-		runL = (int) encodedBlock[c].s1 >> 4;
-		size = (int) encodedBlock[c].s1 - (runL << 4);
+		res = 0;
+		runL = (unsigned int) (encodedBlock[c].s1 >> 4);
+		size = (unsigned int) (encodedBlock[c].s1 - (runL << 4));
+		#ifdef DEBUG_HUFFMAN
+			printf("c = %d and runL = %u and size = %u\n", c, runL, size);
+		#endif
 
-		if (!(runL == 0 && size == 0)){ // don't process the 0's after EOB
-			// calculate the # bits we have to loop through	
-			for (i = 0; i <= runL; i++){ // VERY INEFFICIENT, doesn't work
-				for (j = 0; j < size; j++){
-					totalBits += numBitsAcLum[i][j];
-				}
+		// calculate the # bits we have to loop through	to find the code we want
+		for (i = 0; i < runL; i++){
+			for (j = 0; j < 11; j++){
+				totalBits += numBitsAcLum[i][j];
 			}
+		}
 
-			// now extract the correct huffman code to represent this value
-			codeIndex = totalBits / NUM_COEFFICIENTS;
-			bitPos = (NUM_COEFFICIENTS - 1) - (totalBits % NUM_COEFFICIENTS);
-			bitsToExtract = numBits = numBitsAcLum[runL][size]; // get the length of the huffman code
-			j = 31; // counter to keep track of the bits in the 32 bit storage space
-			while (bitsToExtract > 0){
-				mask = 1;
-				mask <<= bitPos;
-				bit = (mask & ACLum_HuffCodes[codeIndex]) ? 1 : 0; 
-				bit <<= j;
-				res |= (uint32_t) bit;
-				bitPos--;
-				if (bitPos < 0){ bitPos = NUM_COEFFICIENTS - 1; codeIndex++; }
-				j--;
-				bitsToExtract--;
+		for (i = 0; i < size; i++){
+			totalBits += numBitsAcLum[runL][i];
+		}
+
+		// now extract the correct huffman code to represent this value
+		codeIndex = totalBits / NUM_COEFFICIENTS;
+		bitPos = (NUM_COEFFICIENTS - 1) - (totalBits % NUM_COEFFICIENTS);
+		bitsToExtract = numBits = numBitsAcLum[runL][size]; // get the length of the huffman code
+		#ifdef DEBUG_HUFFMAN
+			printf("bitsToExtract = %d and totalBits = %d, bitPos = %d and codeIndex = %d\n", bitsToExtract, totalBits, bitPos, codeIndex);
+		#endif
+		j = 31; // counter to keep track of the bits in the 32 bit storage space
+		while (bitsToExtract > 0){
+			mask = 1;
+			mask <<= bitPos;
+			bit = (mask & ACLum_HuffCodes[codeIndex]) ? 1 : 0; 
+			bit <<= j;
+			res |= bit;
+			bitPos--;
+			if (bitPos < 0){ 
+				bitPos = NUM_COEFFICIENTS - 1; 
+				codeIndex++;
 			}
+			j--;
+			bitsToExtract--;
+		}
 
-			block[c].nBits = numBits;
-			block[c].bits = res;
+		block[c].nBits = numBits;
+		block[c].bits = res;
+		if (!(runL == 0 && size == 0)){ // don't encode a zero
 			huffmanEncodeValue(&block[c], encodedBlock[c].s2, size);
 		}
-	}
+
+		else{
+			break; // reached EOB so just break
+		}
+	}	
 
 	#ifdef DEBUG_HUFFMAN
 	for (c = 1; c < NUM_COEFFICIENTS; c++){

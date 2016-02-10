@@ -34,6 +34,10 @@
 #define MAX_ZEROES 16
 #define ZRL_VALUE 15
 
+// huffman encoding constants
+#define LUMINANCE 0 // indexes for the global arrays below
+#define CHROMINANCE 1
+
 // #define DEBUG // debugging constant
 // #define DEBUG_PRE // debugging constant for the preprocessing code
 // #define DEBUG_BLOCKS // debugging constant for the code that creates 8x8 blocks
@@ -79,6 +83,8 @@
 	* add down sampling (might need to), current setting is 4:4:4
 	* store the quantisation table inside jDat
 	* instead of freeing everything at once, free resources when we no longer require them
+	* implement an array of 2-d arrays for the codes in the huffman functions
+	* lots of magic numbers
 	
 */
 
@@ -227,10 +233,8 @@ int numOfBits(int x); // determines the # bits required to represent a number x
 char *intToHuffBits(int x); // convert an integer into huffman bits
 
 // utility functions for the huffman encoding process
-void DCHuffmanEncodeLum(Symbol encodedDC, HuffSymbol *block);
-void ACHuffmanEncodeLum(Symbol *encodedBlock, HuffSymbol *block);
-void DCHuffmanEncodeChrom(Symbol encodedDC, HuffSymbol *block);
-void ACHuffmanEncodeChrom(Symbol *encodedBlock, HuffSymbol *block);
+void DCHuffmanEncode(Symbol encodedDC, HuffSymbol *block, int component);
+void ACHuffmanEncode(Symbol *encodedBlock, HuffSymbol *block, int component);
 void huffmanEncodeValue(HuffSymbol *huffCoeff, int value, int bitSize);
 
 // free resources
@@ -251,6 +255,15 @@ static int determineFileSize(FILE *f); // determines the size of a file
 #ifdef DEBUG
 static void dbg_out_file(Pixel p, int size); // dumps the contents of buf into a file 
 #endif
+
+// array of pointers that point to relevant huffman tables
+// tables that indicate the # bits of the huffman code for each (run/size)
+static const int *DC_nbits[2] = {numBitsDcLum, numBitsDcChr};
+static const int (*AC_nbits[])[11] = {numBitsAcLum, numBitsAcChr};
+
+// tables that contain the huffman codes for each (run/size)
+static const uint8_t *DC_codes[2] = {DCLum_HuffCodes, DCChr_HuffCodes};
+static const uint64_t *AC_codes[2] = {ACLum_HuffCodes, ACChr_HuffCodes};
 
 // can easily be adapted to other image formats other than BMP - mainly used for testing
 Pixel imageToRGB(const char *imageName, int *bufSize)
@@ -318,13 +331,14 @@ void encodeRGBToJpgDisk(const char *jpgFile, Pixel rgbBuffer, unsigned int numPi
 
 		// write binary contents to disk
 
+		// free memory
 		disposeJpgData(jD);
 	}
 	
 	else{
 		printf("Unable to allocate memory to store jpeg data.\n");
 	}
-	
+
 }
 
 /* ==================== JPG PREPROCESSING ======================*/
@@ -975,21 +989,24 @@ void huffmanEncoding(JpgData jDat)
 			printf("Block number: %d\n", i + 1);
 		#endif
 		// huffman encode a Y block
-		DCHuffmanEncodeLum(jDat->encodeY[i][0], jDat->huffmanY[i]);
-		ACHuffmanEncodeLum(jDat->encodeY[i], jDat->huffmanY[i]);
+		printf("Y component: \n");
+		DCHuffmanEncode(jDat->encodeY[i][0], jDat->huffmanY[i], LUMINANCE);
+		ACHuffmanEncode(jDat->encodeY[i], jDat->huffmanY[i], LUMINANCE);
 		
 		// huffman encode a Cb block
-		DCHuffmanEncodeChrom(jDat->encodeCb[i][0], jDat->huffmanCb[i]);
-		ACHuffmanEncodeChrom(jDat->encodeCb[i], jDat->huffmanCb[i]);
+		printf("Cb component: \n");
+		DCHuffmanEncode(jDat->encodeCb[i][0], jDat->huffmanCb[i], CHROMINANCE);
+		ACHuffmanEncode(jDat->encodeCb[i], jDat->huffmanCb[i], CHROMINANCE);
 
 		// huffman encode a Cr block
-		DCHuffmanEncodeChrom(jDat->encodeCr[i][0], jDat->huffmanCr[i]);
-		ACHuffmanEncodeChrom(jDat->encodeCr[i], jDat->huffmanCr[i]);
+		printf("Cr component: \n");
+		DCHuffmanEncode(jDat->encodeCr[i][0], jDat->huffmanCr[i], CHROMINANCE);
+		ACHuffmanEncode(jDat->encodeCr[i], jDat->huffmanCr[i], CHROMINANCE);
 	}
 }
 
 // applies huffman encoding to a luminance DC coefficient
-void DCHuffmanEncodeLum(Symbol encodedDC, HuffSymbol *block)
+void DCHuffmanEncode(Symbol encodedDC, HuffSymbol *block, int component)
 {
 	int bitsToSearch = 0;
 	int numBits = 0;
@@ -1001,7 +1018,7 @@ void DCHuffmanEncodeLum(Symbol encodedDC, HuffSymbol *block)
 	
 	bitSize = (int) encodedDC.s1;
 	for (i = 0; i < bitSize; i++){ // get the length of the # bits to pass until we reach the desired huffman code
-		bitsToSearch += numBitsDCLum[i];
+		bitsToSearch += DC_nbits[component][i];
 	}
 
 	codeIndex = bitsToSearch / 8; // get the index that the code will be in -> bit pos to start extracting from
@@ -1012,8 +1029,10 @@ void DCHuffmanEncodeLum(Symbol encodedDC, HuffSymbol *block)
 		printf("Code index: %d and bitPos = %d\n", codeIndex, bitPos);
 	#endif 
 
-	numBits = numBitsDCLum[bitSize]; // tells us the # bits available for extraction in the current element
+	// tells us the # bits needed to extract the correct code
+	numBits = DC_nbits[component][bitSize];
 	i = numBits;
+
 	#ifdef DEBUG_HUFFMAN
 		printf("numBits = %d\n", numBits);
 	#endif
@@ -1021,7 +1040,7 @@ void DCHuffmanEncodeLum(Symbol encodedDC, HuffSymbol *block)
 	while (i > 0){ // extract the bits, bits are not alligned
 		mask = 1;
 		mask <<= bitPos; // extract the correct bit pos
-		bit = (uint32_t) (DCLum_HuffCodes[codeIndex] & mask); // '1' or '0'
+		bit = (uint32_t) (DC_codes[component][codeIndex] & mask);
 		bit = (bit) ? 1 : 0;
 		bit <<= j;
 		res |= bit;
@@ -1051,7 +1070,7 @@ void DCHuffmanEncodeLum(Symbol encodedDC, HuffSymbol *block)
 }
 
 // applies huffman encoding to luminance AC coefficients
-void ACHuffmanEncodeLum(Symbol *encodedBlock, HuffSymbol *block)
+void ACHuffmanEncode(Symbol *encodedBlock, HuffSymbol *block, int component)
 {
 	int i = 0, j = 0;
 	int c = 0; // current coefficient
@@ -1075,18 +1094,18 @@ void ACHuffmanEncodeLum(Symbol *encodedBlock, HuffSymbol *block)
 		// calculate the # bits we have to loop through	to find the code we want
 		for (i = 0; i < runL; i++){
 			for (j = 0; j < 11; j++){
-				totalBits += numBitsAcLum[i][j];
+					totalBits += (AC_nbits[component])[i][j];
 			}
 		}
 
 		for (i = 0; i < size; i++){
-			totalBits += numBitsAcLum[runL][i];
+			totalBits += (AC_nbits[component])[i][j];
 		}
 
 		// now extract the correct huffman code to represent this value
 		codeIndex = totalBits / NUM_COEFFICIENTS;
 		bitPos = (NUM_COEFFICIENTS - 1) - (totalBits % NUM_COEFFICIENTS);
-		bitsToExtract = numBits = numBitsAcLum[runL][size]; // get the length of the huffman code
+		bitsToExtract = numBits = (AC_nbits[component])[runL][size]; // get the length of the huffman code
 		#ifdef DEBUG_HUFFMAN
 			printf("bitsToExtract = %d and totalBits = %d, bitPos = %d and codeIndex = %d\n", bitsToExtract, totalBits, bitPos, codeIndex);
 		#endif
@@ -1094,7 +1113,7 @@ void ACHuffmanEncodeLum(Symbol *encodedBlock, HuffSymbol *block)
 		while (bitsToExtract > 0){
 			mask = 1;
 			mask <<= bitPos;
-			bit = (mask & ACLum_HuffCodes[codeIndex]) ? 1 : 0; 
+			bit = (mask & AC_codes[component][codeIndex]) ? 1 : 0; 
 			bit <<= j;
 			res |= bit;
 			bitPos--;
@@ -1130,16 +1149,6 @@ void ACHuffmanEncodeLum(Symbol *encodedBlock, HuffSymbol *block)
 		printf("\n");
 	}
 	#endif
-}
-
-void DCHuffmanEncodeChrom(Symbol encodedDC, HuffSymbol *block)
-{
-	printf("Not yet implemented.\n");
-}
-
-void ACHuffmanEncodeChrom(Symbol *encodedBlock, HuffSymbol *block)
-{
-	printf("Not yet implemented.\n");
 }
 
 void huffmanEncodeValue(HuffSymbol *huffCoeff, int value, int bitSize)

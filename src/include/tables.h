@@ -77,10 +77,10 @@ static const Byte ACHuffmanChrValues[162] = {
 */
 
 static const uint8_t DCLum_HuffCodes[7] = {19, 151, 119, 190, 253, 253, 254};
-static const int numBitsDCLum[12] = {2, 3, 3, 3, 3, 3, 4, 5, 6, 7, 8, 9}; // index = # bits to represent, values = how far to search the huffman table above to get the rep
+static const int numBitsDcLum[12] = {2, 3, 3, 3, 3, 3, 4, 5, 6, 7, 8, 9}; // index = # bits to represent, values = how far to search the huffman table above to get the rep
 
 static const uint8_t DCChr_HuffCodes[9] = {27, 119, 190, 253, 253, 254, 255, 191, 240};
-static const int numBitsDCChr[12] = {2, 2, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
+static const int numBitsDcChr[12] = {2, 2, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
 
 static const uint64_t ACLum_HuffCodes[36] = {11643967909800705047U, 18167080885398765506U, 
 9206201803425972164U, 8351916709912289272U, 12680095826223620088U, 

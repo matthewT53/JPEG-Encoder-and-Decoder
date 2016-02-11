@@ -1099,7 +1099,7 @@ void ACHuffmanEncode(Symbol *encodedBlock, HuffSymbol *block, int component)
 		}
 
 		for (i = 0; i < size; i++){
-			totalBits += (AC_nbits[component])[i][j];
+			totalBits += (AC_nbits[component])[runL][i];
 		}
 
 		// now extract the correct huffman code to represent this value

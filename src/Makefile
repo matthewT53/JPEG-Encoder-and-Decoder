@@ -4,7 +4,7 @@ CFLAGS=-Wall -Werror -std=c99 -c
 all: jpeg
 
 jpeg: jpgDriver.o jpgEncode.o
-	$(CC) jpgDriver.o jpgEncode.o -o jpg -lm
+	$(CC) jpgDriver.o jpgEncode.o -o jpg -lm -pg
 
 jpgDriver.o: jpgDriver.c
 	$(CC) $(CFLAGS) jpgDriver.c

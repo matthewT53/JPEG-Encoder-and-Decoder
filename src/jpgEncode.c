@@ -38,15 +38,26 @@
 #define LUMINANCE 0 // indexes for the global arrays below
 #define CHROMINANCE 1
 
+// marker constants
+#define FIRST_MARKER	0xFF
+#define SOI_MARKER		0xD8
+#define APP0_MARKER		0xE0
+#define SOF0_MARKER		0xC0
+#define HUFFMAN_MARKER	0xC4
+#define QUAN_MARKER		0xDB
+#define SCAN_MARKER		0xDA
+#define COMMENT_MARKER	0xFE
+#define EOI_MARKER		0xD9
+
 // #define DEBUG // debugging constant
 // #define DEBUG_PRE // debugging constant for the preprocessing code
 // #define DEBUG_BLOCKS // debugging constant for the code that creates 8x8 blocks
 // #define DEBUG_DCT // debugging constant for the dct process
 // #define DEBUG_QUAN // debugging constant for the quan process
-#define DEBUG_ZZ // debugging constant for zig-zag process
-#define DEBUG_DPCM // debugging constant for DPCM process
-#define DEBUG_RUN // debugging constant for run length coding
-#define DEBUG_HUFFMAN // debugging constant for huffman encoding
+// #define DEBUG_ZZ // debugging constant for zig-zag process
+// #define DEBUG_DPCM // debugging constant for DPCM process
+// #define DEBUG_RUN // debugging constant for run length coding
+// #define DEBUG_HUFFMAN // debugging constant for huffman encoding
 
 // #define LEVEL_SHIFT
 
@@ -69,6 +80,10 @@
 	* http://www.cs.cf.ac.uk/Dave/MM/BSC_MM_CALLER/PDF/10_CM0340_JPEG.pdf -> good overview of jpeg
 	* http://www.ctralie.com/PrincetonUGRAD/Projects/JPEG/jpeg.pdf -> mainly for decoding but also helps with encoding
 	* https://www.opennet.ru/docs/formats/jpeg.txt -> good overview
+
+	Chroma subsampling:
+	* http://www.impulseadventure.com/photo/jpeg-decoder.html
+	* http://stackoverflow.com/questions/27918757/interpreting-jpeg-chroma-subsampling-read-from-file
 
 	Algorithm: Quantization quality factor
 	1 < Q < 100 ( quality range );
@@ -219,6 +234,14 @@ void huffmanEncoding(JpgData jDat);
 
 */
 void blockToCoords(JpgData jDat, int bn, int *x, int *y); // more of a utility function, but i think its a critical part of the code
+
+/*
+	This function creates the jpeg binary file
+	Input: JpgData structure and JPEG filename
+	Output: JPEG binary file on disk
+*/
+void writeToFile(JpgData jDat, const char *fileName); 
+	
 /* ================== END of Encoding functions ==================== */
 
 /* ================== Utility functions ========================= */
@@ -236,6 +259,18 @@ char *intToHuffBits(int x); // convert an integer into huffman bits
 void DCHuffmanEncode(Symbol encodedDC, HuffSymbol *block, int component);
 void ACHuffmanEncode(Symbol *encodedBlock, HuffSymbol *block, int component);
 void huffmanEncodeValue(HuffSymbol *huffCoeff, int value, int bitSize);
+
+// functions for constructing the JPEG binary file
+void writeSOI(FILE *fp); // start of image
+void writeAPP0(FILE *fp); // JFIF standard
+void writeDQT(FILE *fp, JpgData jDat); // store quantization tables
+void writeDHT(FILE *fp, JpgData jDat); // store Huffman tables
+void writeFrameHeader(FILE *fp, JpgData jDat); 
+void writeScanHeader(FILE *fp, JpgData jDat);
+void writeScanData(FILE *fp, JpgData jDat); // entropy encoded data
+void writeByte(FILE *fp, Byte b); // writes a single byte into a file
+void writeComment(FILE *fp, char *comment); // includes a comment in the binary file
+void writeEOI(FILE *fp); // end of image
 
 // free resources
 void disposeJpgData(JpgData jdat);
@@ -330,6 +365,7 @@ void encodeRGBToJpgDisk(const char *jpgFile, Pixel rgbBuffer, unsigned int numPi
 		huffmanEncoding(jD);
 
 		// write binary contents to disk
+		writeToFile(jD, jpgFile);
 
 		// free memory
 		disposeJpgData(jD);
@@ -989,17 +1025,23 @@ void huffmanEncoding(JpgData jDat)
 			printf("Block number: %d\n", i + 1);
 		#endif
 		// huffman encode a Y block
-		printf("Y component: \n");
+		#ifdef DEBUG_HUFFMAN
+			printf("Y component: \n");
+		#endif
 		DCHuffmanEncode(jDat->encodeY[i][0], jDat->huffmanY[i], LUMINANCE);
 		ACHuffmanEncode(jDat->encodeY[i], jDat->huffmanY[i], LUMINANCE);
 		
 		// huffman encode a Cb block
+		#ifdef DEBUG_HUFFMAN		
 		printf("Cb component: \n");
+		#endif
 		DCHuffmanEncode(jDat->encodeCb[i][0], jDat->huffmanCb[i], CHROMINANCE);
 		ACHuffmanEncode(jDat->encodeCb[i], jDat->huffmanCb[i], CHROMINANCE);
 
 		// huffman encode a Cr block
+		#ifdef DEBUG_HUFFMAN
 		printf("Cr component: \n");
+		#endif
 		DCHuffmanEncode(jDat->encodeCr[i][0], jDat->huffmanCr[i], CHROMINANCE);
 		ACHuffmanEncode(jDat->encodeCr[i], jDat->huffmanCr[i], CHROMINANCE);
 	}
@@ -1168,7 +1210,9 @@ void huffmanEncodeValue(HuffSymbol *huffCoeff, int value, int bitSize)
 	}
 	// determine the "additional bits" associated with the value
 	mask = 1;
+	#ifdef DEBUG_HUFFMAN
 	printf("Size of value: %d and Min value: %d and value = %d\n", bitSize, minValue, value);
+	#endif
 	while (minValue < value){ // loop until additional bits represents our value
 		bit = additionalBits & mask; // extract rightmost bit
 		if (bit == 1){
@@ -1216,6 +1260,134 @@ void huffmanEncodeValue(HuffSymbol *huffCoeff, int value, int bitSize)
 		bitPos++;
 	}
 	huffCoeff->nBits += bitSize;
+}
+
+// produces a JPEG binary file
+void writeToFile(JpgData jDat, const char *fileName)
+{
+	FILE *fp = fopen(fileName, "wb");
+
+	// write JPEG data into 
+	if (fp != NULL){
+		writeSOI(fp);
+		writeAPP0(fp);
+		writeDQT(fp, jDat);
+		writeFrameHeader(fp, jDat);
+		writeDHT(fp, jDat);
+		writeScanHeader(fp, jDat);
+		writeScanData(fp, jDat);
+		writeComment(fp, "MatthewT53's Jpeg encoder");
+		writeEOI(fp);
+
+		fclose(fp);
+	}
+
+	else{
+		printf("Unable to create file for writing.\n");
+	}
+}
+
+// write the SOI marker into the file
+void writeSOI(FILE *fp)
+{
+	writeByte(fp, FIRST_MARKER);
+	writeByte(fp, SOI_MARKER);
+}
+
+// write the JFIF standard APP0 into the jpeg image
+void writeAPP0(FILE *fp)
+{
+	// standard 2-byte marker (0xFF, 0xE0)
+	writeByte(fp, FIRST_MARKER);
+	writeByte(fp, APP0_MARKER);
+	
+	// length of APP0
+	writeByte(fp, 0x00);
+	writeByte(fp, 0x10);
+
+	// write JFIF
+	writeByte(fp, 0x4A); // J
+	writeByte(fp, 0x46); // F
+	writeByte(fp, 0x49); // I
+	writeByte(fp, 0x46); // F
+	writeByte(fp, 0x00); // terminating null char
+
+	// write the JFIF version, 1.02
+	writeByte(fp, 0x01);
+	writeByte(fp, 0x02);
+
+	// dots/inch
+	writeByte(fp, 0x01);
+	
+	// write thumbnail width
+	writeByte(fp, 0x00);
+	writeByte(fp, 0x48);
+
+	// write thumbnail height
+	writeByte(fp, 0x00);
+	writeByte(fp, 0x48);
+
+	// write # pixels for thumbnail in x direction
+	writeByte(fp, 0x00);
+	writeByte(fp, 0x00); // y direction	
+}
+
+void writeDQT(FILE *fp, JpgData jDat)
+{
+	// write the marker for this segment
+	writeByte(fp, FIRST_MARKER);
+	writeByte(fp, QUAN_MARKER);
+	printf("Not yet implemented.\n");
+}
+
+void writeFrameHeader(FILE *fp, JpgData jDat)
+{
+	// frame header marker
+	writeByte(fp, FIRST_MARKER);
+	writeByte(fp, SOF0_MARKER);
+	printf("Maybe tomorrow.\n");
+}
+
+void writeDHT(FILE *fp, JpgData jDat)
+{
+	// DHT marker
+	writeByte(fp, FIRST_MARKER);
+	writeByte(fp, HUFFMAN_MARKER);
+	printf("Tomorrow bud.\n");
+}
+
+void writeScanHeader(FILE *fp, JpgData jDat)
+{
+	// scan marker
+	writeByte(fp, FIRST_MARKER);
+	writeByte(fp, SCAN_MARKER);
+	printf("Yes.\n");
+}
+
+void writeScanData(FILE *fp, JpgData jDat)
+{
+	printf("This is my data.\n");
+	// entropy data goes here
+}
+
+void writeComment(FILE *fp, char *comment)
+{
+	writeByte(fp, FIRST_MARKER);
+	writeByte(fp, COMMENT_MARKER);
+	printf("This is my comment.\n");
+}
+
+void writeEOI(FILE *fp)
+{
+	writeByte(fp, FIRST_MARKER);
+	writeByte(fp, EOI_MARKER);
+	printf("End of jpeg ;)\n");
+}
+
+// writes a single byte into a file
+void writeByte(FILE *fp, Byte b)
+{
+	fwrite(&b, sizeof(Byte), 1, fp);
 }
 
 // free resources

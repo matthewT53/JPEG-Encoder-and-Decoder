@@ -13,7 +13,7 @@ int main(void)
 {
 	int size = 0;
 	Pixel rgbBuf = imageToRGB("tiger.bmp", &size);
-	encodeRGBToJpgDisk("new.jpg", rgbBuf, size, 320, 240, 50);
+	encodeRGBToJpgDisk("new.jpg", rgbBuf, size, 320, 240, 94);
 
 	free(rgbBuf);
 

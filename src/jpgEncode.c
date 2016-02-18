@@ -133,6 +133,13 @@ typedef struct _jpegData{
 	int quality; // 1 < q < 100, default = 50
 	int numBlocks; // counts the number of 8x8 blocks in the image
 
+	// quantization tables
+	unsigned char DQT_TableY[QUAN_MAT_SIZE][QUAN_MAT_SIZE];
+	unsigned char DQT_TableChr[QUAN_MAT_SIZE][QUAN_MAT_SIZE];
+
+	unsigned char DQT_Y_zz[NUM_COEFFICIENTS]; // holds the quantization matrix for luminance
+	unsigned char DQT_CHR_zz[NUM_COEFFICIENTS]; // holds the chrominance quantization matrix
+
 	// zig-zag ordering stuff
 	int **zzY; // rows = # blocks, cols = # coefficients which is 64
 	int **zzCb;
@@ -255,6 +262,9 @@ void sanitise(Symbol *s); // removes random ZRL and places the EOB in the correc
 int numOfBits(int x); // determines the # bits required to represent a number x
 char *intToHuffBits(int x); // convert an integer into huffman bits
 
+// utility function for quantization
+void buildQuanTables(JpgData jDat);
+
 // utility functions for the huffman encoding process
 void DCHuffmanEncode(Symbol encodedDC, HuffSymbol *block, int component);
 void ACHuffmanEncode(Symbol *encodedBlock, HuffSymbol *block, int component);
@@ -265,8 +275,8 @@ void writeSOI(FILE *fp); // start of image
 void writeAPP0(FILE *fp); // JFIF standard
 void writeDQT(FILE *fp, JpgData jDat); // store quantization tables
 void writeDHT(FILE *fp, JpgData jDat); // store Huffman tables
-void writeFrameHeader(FILE *fp, JpgData jDat); 
-void writeScanHeader(FILE *fp, JpgData jDat);
+void writeFrameHeader(FILE *fp, JpgData jDat); // header for everything between SOI and EOI
+void writeScanHeader(FILE *fp, JpgData jDat); // header for the scan data
 void writeScanData(FILE *fp, JpgData jDat); // entropy encoded data
 void writeByte(FILE *fp, Byte b); // writes a single byte into a file
 void writeComment(FILE *fp, char *comment); // includes a comment in the binary file
@@ -599,6 +609,8 @@ void dct(JpgData jDat)
 		jDat->quanCr[i] = calloc(jDat->totalWidth, sizeof(int));
 	}
 
+	buildQuanTables(jDat); // build the quantization tables to use
+
 	#ifdef DEBUG_DCT
 		printf("numBlocks: %d\n", jDat->numBlocks);
 		printf("TW = %d and TH = %d\n", jDat->totalWidth, jDat->totalHeight);
@@ -657,36 +669,65 @@ void dct(JpgData jDat)
 	}
 }
 
+void buildQuanTables(JpgData jDat)
+{
+	unsigned char q = (unsigned char) jDat->quality; // quality factor
+	unsigned char s = 0; // scale factor
+	int i = 0, j = 0;
+	int x = 0, y = 0;
+	Coordinate c[NUM_COEFFICIENTS];
+
+	// check if quality has the correct value
+	if (q < 1 || q >= 100){
+		q = jDat->quality = DEFAULT_QUALITY; // default quality = 50
+	}
+	
+	s = ((q < DEFAULT_QUALITY) ? (5000 / q) : (200 - (2*q))); // get the quality scaling factor
+
+	for (i = 0; i < QUAN_MAT_SIZE; i++){
+		for (j = 0; j < QUAN_MAT_SIZE; j++){
+			jDat->DQT_TableY[i][j] = ((s*quanMatrixLum[i][j] + 50) / 100);
+			jDat->DQT_TableChr[i][j] = ((s*quanMatrixChr[i][j] + 50) / 100);
+		}
+	}
+
+	// store this table in vector to write to the file
+	loadCoordinates(c);
+
+	for (i = 0; i < NUM_COEFFICIENTS; i++){
+		y = c[i].y;
+		x = c[i].x;
+		jDat->DQT_Y_zz[i] = jDat->DQT_TableY[y][x];
+		jDat->DQT_CHR_zz[i] = jDat->DQT_TableChr[y][x];
+	}
+
+	#ifdef DEBUG_QUAN
+		for (i = 0; i < QUAN_MAT_SIZE; i++){
+			for (j = 0; j < QUAN_MAT_SIZE; j++){
+				printf("%4d", jDat->DQT_TableY[i][j]);
+			}
+			printf("\n");
+		}
+
+		printf("Zig zag vector: ");
+		for (i = 0; i < NUM_COEFFICIENTS; i++){
+			printf("%d ", jDat->DQT_Y_zz[i]);
+		}
+		printf("\n");
+	#endif
+}
+
 // quantises the image
 void quantise(JpgData jDat, double dctY[][BLOCK_SIZE], double dctCb[][BLOCK_SIZE], double dctCr[][BLOCK_SIZE], int sx, int sy) // may have to modify for down sampling
 {
-	int q = jDat->quality;
-	int s = 0;
 	int i = 0, j = 0, m = 0, n = 0;
-	int qMatY[QUAN_MAT_SIZE][QUAN_MAT_SIZE] = {0};
-	int qMatCbCr[QUAN_MAT_SIZE][QUAN_MAT_SIZE] = {0};
-
-	// check if quality has the correct value
-	if (q < 1 || q > 100){
-		q = jDat->quality = DEFAULT_QUALITY; // default quality = 50
-	}
-
-	s = ((q < DEFAULT_QUALITY) ? (5000 / q) : (200 - (2*q))); // get the quality scaling factor
-	
-	// change the quan matrix based on the scaling factor
-	for (i = 0; i < BLOCK_SIZE; i++){
-		for (j = 0; j < BLOCK_SIZE; j++){
-			qMatY[i][j] = ((s*quanMatrixLum[i][j] + 50) / 100);
-			qMatCbCr[i][j] = ((s*quanMatrixChr[i][j] + 50) / 100);
-		}
-	}
 	
 	// quantise the matrices
 	for (i = 0, m = sy; i < BLOCK_SIZE; i++, m++){
 		for (j = 0, n = sx; j < BLOCK_SIZE; j++, n++){
-			jDat->quanY[m][n] = (int) round(dctY[i][j] / qMatY[i][j]);
-			jDat->quanCb[m][n] = (int) round(dctCb[i][j] / qMatCbCr[i][j]);
-			jDat->quanCr[m][n] = (int) round(dctCr[i][j] / qMatCbCr[i][j]);
+			jDat->quanY[m][n] = (int) round(dctY[i][j] / jDat->DQT_TableY[i][j]);
+			jDat->quanCb[m][n] = (int) round(dctCb[i][j] / jDat->DQT_TableChr[i][j]);
+			jDat->quanCr[m][n] = (int) round(dctCr[i][j] / jDat->DQT_TableChr[i][j]);
 			#ifdef DEBUG_QUAN
 				printf("%4d ", jDat->quanY[m][n]);
 			#endif
@@ -1334,26 +1375,183 @@ void writeAPP0(FILE *fp)
 
 void writeDQT(FILE *fp, JpgData jDat)
 {
+	Byte PT = 0;
+	Byte b = 0, des = 0;
+	int i = 0;
 	// write the marker for this segment
 	writeByte(fp, FIRST_MARKER);
 	writeByte(fp, QUAN_MARKER);
-	printf("Not yet implemented.\n");
+	
+	// length of this segment (67 bytes)
+	writeByte(fp, 0x00);
+	writeByte(fp, 0x43);
+
+	// PT
+	b <<= 4;
+	b += des;
+	PT |= b;
+
+	writeByte(fp, PT);
+	
+	// quantization coefficients for luminance
+	for (i = 0; i < NUM_COEFFICIENTS; i++){
+		writeByte(fp, jDat->DQT_Y_zz[i]);
+	}
+
+	// store the chrominance QT
+	writeByte(fp, FIRST_MARKER);
+	writeByte(fp, QUAN_MARKER);
+
+	// length
+	writeByte(fp, 0x00);
+	writeByte(fp, 0x43);
+	b = 0;
+	b <<= 4;
+	des = 1;
+	b += des;
+	PT |= b;
+	
+	// PT
+	writeByte(fp, PT);
+	for (i = 0; i < NUM_COEFFICIENTS; i++){
+		writeByte(fp, jDat->DQT_CHR_zz[i]);
+	}
 }
 
 void writeFrameHeader(FILE *fp, JpgData jDat)
 {
+	Byte h[2], w[2];
+	short height = (short) jDat->height, width = (short) jDat->width;
+	int i = 0;
+	Byte sample = 0x11; // Hi: 0001, Vi: 0001
+
 	// frame header marker
 	writeByte(fp, FIRST_MARKER);
 	writeByte(fp, SOF0_MARKER);
-	printf("Maybe tomorrow.\n");
+	
+	// frame length
+	writeByte(fp, 0x00);
+	writeByte(fp, 0x11);
+
+	// bit precision
+	writeByte(fp, 0x08);
+
+	// height of image
+	memcpy(h, &height, 2);
+	writeByte(fp, h[1]);
+	writeByte(fp, h[0]);
+	
+	// width of image
+	memcpy(w, &width, 2);
+	writeByte(fp, w[1]);
+	writeByte(fp, w[0]);
+
+	// # components
+	writeByte(fp, 0x03);
+
+	for (i = 0; i < 3; i++){
+		writeByte(fp, (Byte) (i + 1)); // component ID
+		writeByte(fp, sample); // sampling factors
+		writeByte(fp, (i == 0) ? 0x00 : 0x01);
+	}
 }
 
 void writeDHT(FILE *fp, JpgData jDat)
 {
+	short length = 0;
+	Byte l[2], t = 0;
+	int i = 0;
+	int DCLum_nr_size = sizeof(DCHuffmanLum_nr), DCLum_values_size = sizeof(DCHuffmanLumValues);
+	int ACLum_nr_size = sizeof(ACHuffmanLum_nr), ACLum_values_size = sizeof(ACHuffmanLumValues);
+	int DCChr_nr_size = sizeof(DCHuffmanChr_nr), DCChr_values_size = sizeof(DCHuffmanChrValues);
+	int ACChr_nr_size = sizeof(ACHuffmanChr_nr), ACChr_values_size = sizeof(ACHuffmanChrValues);
+
 	// DHT marker
 	writeByte(fp, FIRST_MARKER);
 	writeByte(fp, HUFFMAN_MARKER);
-	printf("Tomorrow bud.\n");
+	
+	// store the luminance tables first
+	
+	/* DC Luminance */
+	// length
+	length = 2 + DCLum_nr_size + DCLum_values_size;
+	memcpy(l, &length, 2);
+	writeByte(fp, l[1]);
+	writeByte(fp, l[0]);
+
+	// write T
+	writeByte(fp, t);
+
+	// write Lengths
+	for (i = 1; i < DCLum_nr_size; i++){
+		writeByte(fp, DCHuffmanLum_nr[i]);
+	} 
+
+	// write values
+	for (i = 0; i < DCLum_values_size; i++){
+		writeByte(fp, DCHuffmanLumValues[i]);
+	}
+
+	/* AC Luminance */
+	writeByte(fp, FIRST_MARKER);
+	writeByte(fp, HUFFMAN_MARKER);
+	length = 2 + ACLum_nr_size + ACLum_values_size;
+	memcpy(l, &length, 2);
+	writeByte(fp, l[1]);
+	writeByte(fp, l[0]);
+	
+	t = 0x10;
+	writeByte(fp, t);
+	
+	for (i = 1; i < ACLum_nr_size; i++){
+		writeByte(fp, ACHuffmanLum_nr[i]);
+	}
+
+	for (i = 0; i < ACLum_values_size; i++){
+		writeByte(fp, ACHuffmanLumValues[i]);
+	}
+
+	/* DC Chrominance */
+	writeByte(fp, FIRST_MARKER);
+	writeByte(fp, HUFFMAN_MARKER);
+	
+	length = 2 + DCChr_nr_size + DCChr_values_size;
+	memcpy(l, &length, 2);
+	writeByte(fp, l[1]);
+	writeByte(fp, l[0]);
+
+	// write T
+	t = 0x01;
+	writeByte(fp, t);
+
+	// write Lengths
+	for (i = 1; i < DCChr_nr_size; i++){
+		writeByte(fp, DCHuffmanChr_nr[i]);
+	} 
+
+	// write values
+	for (i = 0; i < DCChr_values_size; i++){
+		writeByte(fp, DCHuffmanChrValues[i]);
+	}
+
+	/* AC Chrominance */
+	writeByte(fp, FIRST_MARKER);
+	writeByte(fp, HUFFMAN_MARKER);
+	length = 2 + ACChr_nr_size + ACChr_values_size;
+	memcpy(l, &length, 2);
+	writeByte(fp, l[1]);
+	writeByte(fp, l[0]);
+	
+	t = 0x11;
+	writeByte(fp, t);
+	
+	for (i = 1; i < ACChr_nr_size; i++){
+		writeByte(fp, ACHuffmanChr_nr[i]);
+	}
+
+	for (i = 0; i < ACChr_values_size; i++){
+		writeByte(fp, ACHuffmanChrValues[i]);
+	}
 }
 
 void writeScanHeader(FILE *fp, JpgData jDat)

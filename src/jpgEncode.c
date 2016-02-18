@@ -61,48 +61,6 @@
 
 // #define LEVEL_SHIFT
 
-/*  
-	To clear confusion, just in case.
-	Width: X direction
-	Height: Y direction
-	Image is not down sampled for simplicity, will add this later
-
-	Sources that assisted me:
-	* https://en.wikipedia.org/wiki/JPEG
-	* https://www.w3.org/Graphics/JPEG/itu-t81.pdf -> SPEC which is very convoluted
-	* https://www.cs.auckland.ac.nz/courses/compsci708s1c/lectures/jpeg_mpeg/jpeg.html
-	* http://www.dfrws.org/2008/proceedings/p21-kornblum_pres.pdf -> Quantization quality scaling
-	* http://www.dmi.unict.it/~battiato/EI_MOBILE0708/JPEG%20%28Bruna%29.pdf
-	* http://cnx.org/contents/eMc9DKWD@5/JPEG-Entropy-Coding -> Zig-zag: "Borrowed" the order matrix
-	* http://www.pcs-ip.eu/index.php/main/edu/7 -> zig-zag ordering + entropy encoding 
-	* http://users.ece.utexas.edu/~ryerraballi/MSB/pdfs/M4L1.pdf -> DPCM and Run length encoding
-	* http://www.impulseadventure.com/photo/jpeg-huffman-coding.html -> Huffman encoding
-	* http://www.cs.cf.ac.uk/Dave/MM/BSC_MM_CALLER/PDF/10_CM0340_JPEG.pdf -> good overview of jpeg
-	* http://www.ctralie.com/PrincetonUGRAD/Projects/JPEG/jpeg.pdf -> mainly for decoding but also helps with encoding
-	* https://www.opennet.ru/docs/formats/jpeg.txt -> good overview
-
-	Chroma subsampling:
-	* http://www.impulseadventure.com/photo/jpeg-decoder.html
-	* http://stackoverflow.com/questions/27918757/interpreting-jpeg-chroma-subsampling-read-from-file
-
-	Algorithm: Quantization quality factor
-	1 < Q < 100 ( quality range );
-	s = (Q < 50) ? 5000/Q : 200 - 2Q;
-	Ts[i] (element in new quan table) = ( S * Tb[i] ( element in original quan table ) + 50 ) / 100;
-	
-	Note: 
-	* when Q = 50 there is no change
-	* the higher q is, the larger the file size
-
-	Things to do:
-	* add down sampling (might need to), current setting is 4:4:4
-	* store the quantisation table inside jDat
-	* instead of freeing everything at once, free resources when we no longer require them
-	* implement an array of 2-d arrays for the codes in the huffman functions
-	* lots of magic numbers
-	
-*/
-
 // run length encoding as shown on wikipedia
 typedef struct _Symbol{
 	unsigned char s1; // Symbol 1: runlength (4 bits) | size (4 bits)
@@ -278,9 +236,10 @@ void writeDHT(FILE *fp, JpgData jDat); // store Huffman tables
 void writeFrameHeader(FILE *fp, JpgData jDat); // header for everything between SOI and EOI
 void writeScanHeader(FILE *fp, JpgData jDat); // header for the scan data
 void writeScanData(FILE *fp, JpgData jDat); // entropy encoded data
-void writeByte(FILE *fp, Byte b); // writes a single byte into a file
-void writeComment(FILE *fp, char *comment); // includes a comment in the binary file
+void writeComment(FILE *fp, char *comment, short size); // includes a comment in the binary file
 void writeEOI(FILE *fp); // end of image
+
+void writeByte(FILE *fp, Byte b); // writes a single byte into a file
 
 // free resources
 void disposeJpgData(JpgData jdat);
@@ -1307,6 +1266,7 @@ void huffmanEncodeValue(HuffSymbol *huffCoeff, int value, int bitSize)
 void writeToFile(JpgData jDat, const char *fileName)
 {
 	FILE *fp = fopen(fileName, "wb");
+	char *c = "MatthewT53's Jpeg encoder";
 
 	// write JPEG data into 
 	if (fp != NULL){
@@ -1317,7 +1277,7 @@ void writeToFile(JpgData jDat, const char *fileName)
 		writeDHT(fp, jDat);
 		writeScanHeader(fp, jDat);
 		writeScanData(fp, jDat);
-		writeComment(fp, "MatthewT53's Jpeg encoder");
+		writeComment(fp, c, (short) strlen(c));
 		writeEOI(fp);
 
 		fclose(fp);
@@ -1470,8 +1430,6 @@ void writeDHT(FILE *fp, JpgData jDat)
 	writeByte(fp, FIRST_MARKER);
 	writeByte(fp, HUFFMAN_MARKER);
 	
-	// store the luminance tables first
-	
 	/* DC Luminance */
 	// length
 	length = 2 + DCLum_nr_size + DCLum_values_size;
@@ -1556,30 +1514,73 @@ void writeDHT(FILE *fp, JpgData jDat)
 
 void writeScanHeader(FILE *fp, JpgData jDat)
 {
+	int i = 0;
 	// scan marker
 	writeByte(fp, FIRST_MARKER);
 	writeByte(fp, SCAN_MARKER);
-	printf("Yes.\n");
+	
+	// length
+	writeByte(fp, 0x00);
+	writeByte(fp, 0x0c);
+	
+	// # components
+	writeByte(fp, 0x03);
+
+	// info for each component	
+	for (i = 1; i <= 3; i++){
+		writeByte(fp, (Byte) i);
+		writeByte(fp, (i == 1) ? 0x00 : 0x11);
+	}
+
+	// some other stuff
+	writeByte(fp, 0x00); // Ss
+	writeByte(fp, 0x3F); // Se
+	writeByte(fp, 0x00); // Ah + Al
+}
+
+void writeBlockData(JpgData jDat, HuffSymbol *block)
+{
+	
 }
 
 void writeScanData(FILE *fp, JpgData jDat)
 {
-	printf("This is my data.\n");
-	// entropy data goes here
+	int i = 0;
+
+	// scan marker
+	writeByte(fp, FIRST_MARKER);
+	writeByte(fp, SCAN_MARKER);
+	
+	for (i = 0; i < jDat->numBLocks; i++){
+		writeBlockData(jDat, jDat->huffmanY[i]);
+		writeBlockData(jDat, jDat->huffmanCb[i]);
+		writeBlockData(jDat, jDat->huffmanCr[i]);
+	}
 }
 
-void writeComment(FILE *fp, char *comment)
+void writeComment(FILE *fp, char *comment, short size)
 {
+	short i = 0;
+	Byte length[2];
+
 	writeByte(fp, FIRST_MARKER);
 	writeByte(fp, COMMENT_MARKER);
-	printf("This is my comment.\n");
+	
+	// length
+	memcpy(length, &size, 2);
+	writeByte(fp, length[1]);
+	writeByte(fp, length[0]);
+
+	// copy comment into jpeg
+	for (i = 0; i < size; i++){
+		writeByte(fp, comment[i]);
+	}
 }
 
 void writeEOI(FILE *fp)
 {
 	writeByte(fp, FIRST_MARKER);
 	writeByte(fp, EOI_MARKER);
-	printf("End of jpeg ;)\n");
 }
 
 // writes a single byte into a file

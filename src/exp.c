@@ -1,33 +1,57 @@
-// file to experiment with ideas
+// this file shows that the RGB data starts from the bottom left of the bmp image
+// this contradicts my assumption when writing the encoer that it starts from top left
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
-// common jpeg segment markers
-#define SOI_MARKER  0xD8FF
-#define APP0_MARKER 0xE0FF
-#define SOF0_MARKER 0xC0FF
-#define DHT_MARKER  0xC4FF
-#define DQT_MARKER  0xDBFF
-#define SOS_MARKER  0xDAFF
-#define COM_MARKER  0xFEFF
-#define EOI_MARKER  0xD9FF
+#define HEADER_SIZE 54
+
+int detFileSize(FILE *fp);
 
 int main(void)
 {
-	FILE *fp = fopen("new.jpg", "wb");
-	short c[8] = {SOI_MARKER, APP0_MARKER, SOF0_MARKER, DHT_MARKER, DQT_MARKER, SOS_MARKER, COM_MARKER, EOI_MARKER};
+	FILE *fp = fopen("tiger.bmp", "rb");
+	FILE *new = NULL;
+	unsigned char *buffer = NULL;
+	int fs = 0, bytesRead = 0, bytesWritten = 0;
+	char r = 0;
 	int i = 0;
-
+		
+	srand(time(NULL)); // random seed
 	if (fp != NULL){
-		for (i = 0; i < 8; i++){
-			fwrite(&c[i], 2, 1, fp);
+		fs = detFileSize(fp);
+		buffer = malloc(sizeof(unsigned char) * (fs + 1));
+		bytesRead = fread(buffer, sizeof(unsigned char), fs, fp);
+		printf("Bytes read: %d\n", bytesRead);
+		for (i = 1; i < 50; i++){
+			r = rand() % 256;
+			buffer[HEADER_SIZE + i] = r;
 		}
+		
+		new = fopen("exp.bmp", "wb");
+		if (new != NULL){
+			fwrite(buffer, sizeof(unsigned char), fs, new);
+			fclose(new);
+		}
+		fclose(fp);
+		free(buffer);
 	}
-
+	
 	else{
-		printf("Error opening file.\n");
+		printf("Cannot open image file.\n");
 	}
 
-	return EXIT_SUCCESS;
+	return 0;
+}
+
+int detFileSize(FILE *fp)
+{
+	int fs = 0;
+
+	rewind(fp);
+	fseek(fp, 0, SEEK_END);
+	fs = (int) ftell(fp);
+	fseek(fp, 0, SEEK_SET);
+	return fs;
 }

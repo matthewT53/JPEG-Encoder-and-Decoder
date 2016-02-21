@@ -57,9 +57,9 @@
 // #define DEBUG_ZZ // debugging constant for zig-zag process
 // #define DEBUG_DPCM // debugging constant for DPCM process
 // #define DEBUG_RUN // debugging constant for run length coding
-// #define DEBUG_HUFFMAN // debugging constant for huffman encoding
+#define DEBUG_HUFFMAN // debugging constant for huffman encoding
 
-// #define LEVEL_SHIFT
+#define LEVEL_SHIFT
 
 // run length encoding as shown on wikipedia
 typedef struct _Symbol{
@@ -236,6 +236,7 @@ void writeDHT(FILE *fp, JpgData jDat); // store Huffman tables
 void writeFrameHeader(FILE *fp, JpgData jDat); // header for everything between SOI and EOI
 void writeScanHeader(FILE *fp, JpgData jDat); // header for the scan data
 void writeScanData(FILE *fp, JpgData jDat); // entropy encoded data
+void writeBlockData(FILE *fp, JpgData jDat, HuffSymbol *block, Byte *b, int *bitPos);
 void writeComment(FILE *fp, char *comment, short size); // includes a comment in the binary file
 void writeEOI(FILE *fp); // end of image
 
@@ -343,7 +344,6 @@ void encodeRGBToJpgDisk(const char *jpgFile, Pixel rgbBuffer, unsigned int numPi
 	else{
 		printf("Unable to allocate memory to store jpeg data.\n");
 	}
-
 }
 
 /* ==================== JPG PREPROCESSING ======================*/
@@ -360,9 +360,9 @@ void convertRGBToYCbCr(JpgData jDat, Pixel rgb, unsigned int numPixels)
 {
 	int i = 0;
 	// printf("Not yet implemented conversion space.\n");
-	jDat->Y = malloc(sizeof(char) * numPixels);
-	jDat->Cb = malloc(sizeof(char) * numPixels);
-	jDat->Cr = malloc(sizeof(char) * numPixels);
+	jDat->Y = malloc(sizeof(unsigned char) * numPixels);
+	jDat->Cb = malloc(sizeof(unsigned char) * numPixels);
+	jDat->Cr = malloc(sizeof(unsigned char) * numPixels);
 
 	if (jDat->Y == NULL || jDat->Cb == NULL || jDat->Cr == NULL){
 		printf("Error allocating space for the jpeg data.\n");
@@ -385,7 +385,6 @@ void convertRGBToYCbCr(JpgData jDat, Pixel rgb, unsigned int numPixels)
 			printf("Cr: %d\n", jDat->Cr[i]);
 		}
 	#endif
-
 }
 
 // convert the image into 8 by 8 blocks
@@ -532,7 +531,6 @@ void levelShift(JpgData jDat)
 		}
 	}
 }
-
 #endif
 
 // applies dicrete cosine transformation to the image
@@ -723,7 +721,7 @@ void zigZag(JpgData jDat)
 	} 
 
 	loadCoordinates(c);
-	// process earch block from the quantized matrices
+	// process each block from the quantized matrices
 	for (curBlock = 1; curBlock <= jDat->numBlocks; curBlock++){
 		blockToCoords(jDat, curBlock, sX, sY);
 		startX = sX[0];
@@ -874,6 +872,7 @@ void runLength(JpgData jDat)
 		unsigned char runL = 0;
 		unsigned char size = 0;
 		printf("Debugging run length coding.\n");
+		printf("Luminance: \n");
 		for (i = 0; i < jDat->numBlocks; i++){
 			printf("Block: %d\n", i + 1);
 			for (j = 1; j < NUM_COEFFICIENTS; j++){ 	
@@ -881,6 +880,30 @@ void runLength(JpgData jDat)
 				size = jDat->encodeY[i][j].s1 - (runL << 4);
 				if (runL == 0 && size == 0 && jDat->encodeY[i][j].s2 == 0) { printf("EOB\n"); break; }
 				printf("([r = %d, s = %d], A = %d)\n", runL, size, jDat->encodeY[i][j].s2);
+			}
+			printf("\n");
+		}
+
+		printf("Cb:\n");
+		for (i = 0; i < jDat->numBlocks; i++){
+			printf("Block: %d\n", i + 1);
+			for (j = 1; j < NUM_COEFFICIENTS; j++){ 	
+				runL = jDat->encodeCb[i][j].s1 >> 4;
+				size = jDat->encodeCb[i][j].s1 - (runL << 4);
+				if (runL == 0 && size == 0 && jDat->encodeCb[i][j].s2 == 0) { printf("EOB\n"); break; }
+				printf("([r = %d, s = %d], A = %d)\n", runL, size, jDat->encodeCb[i][j].s2);
+			}
+			printf("\n");
+		}
+		
+		printf("Cr: \n");
+		for (i = 0; i < jDat->numBlocks; i++){
+			printf("Block: %d\n", i + 1);
+			for (j = 1; j < NUM_COEFFICIENTS; j++){ 	
+				runL = jDat->encodeCr[i][j].s1 >> 4;
+				size = jDat->encodeCr[i][j].s1 - (runL << 4);
+				if (runL == 0 && size == 0 && jDat->encodeCr[i][j].s2 == 0) { printf("EOB\n"); break; }
+				printf("([r = %d, s = %d], A = %d)\n", runL, size, jDat->encodeCr[i][j].s2);
 			}
 			printf("\n");
 		}
@@ -1100,6 +1123,7 @@ void DCHuffmanEncode(Symbol encodedDC, HuffSymbol *block, int component)
 	huffmanEncodeValue(&block[0], encodedDC.s2, bitSize);
 	#ifdef DEBUG_HUFFMAN
 		printf("Huffman encoded DC: ");
+		printf("(nBits = %d): ", block[0].nBits);
 		uint32_t mask2 = 0;
 		for (i = 32 - 1; i >= 0; i--){
 			mask2 = 1;
@@ -1181,7 +1205,7 @@ void ACHuffmanEncode(Symbol *encodedBlock, HuffSymbol *block, int component)
 	#ifdef DEBUG_HUFFMAN
 	for (c = 1; c < NUM_COEFFICIENTS; c++){
 		res = block[c].bits;
-		printf("Coefficient: %2d : ", c);
+		printf("Coefficient: %2d (nBits = %d): ", c, block[c].nBits);
 		for (i = 32- 1; i >= 0; i--){
 			mask = 1;
 			mask <<= i;
@@ -1322,11 +1346,11 @@ void writeAPP0(FILE *fp)
 	
 	// write thumbnail width
 	writeByte(fp, 0x00);
-	writeByte(fp, 0x48);
+	writeByte(fp, 0x01);
 
 	// write thumbnail height
 	writeByte(fp, 0x00);
-	writeByte(fp, 0x48);
+	writeByte(fp, 0x01);
 
 	// write # pixels for thumbnail in x direction
 	writeByte(fp, 0x00);
@@ -1538,24 +1562,90 @@ void writeScanHeader(FILE *fp, JpgData jDat)
 	writeByte(fp, 0x00); // Ah + Al
 }
 
-void writeBlockData(JpgData jDat, HuffSymbol *block)
-{
-	
-}
-
 void writeScanData(FILE *fp, JpgData jDat)
 {
 	int i = 0;
+	Byte b = 0xFF;
+	int bitPos = 7;
 
-	// scan marker
-	writeByte(fp, FIRST_MARKER);
-	writeByte(fp, SCAN_MARKER);
-	
-	for (i = 0; i < jDat->numBLocks; i++){
-		writeBlockData(jDat, jDat->huffmanY[i]);
-		writeBlockData(jDat, jDat->huffmanCb[i]);
-		writeBlockData(jDat, jDat->huffmanCr[i]);
+	#ifdef DEBUG_HUFFMAN
+		printf("Debugging huffman data being written to file: \n");
+	#endif
+	for (i = 0; i < jDat->numBlocks; i++){
+		#ifdef DEBUG_HUFFMAN
+			printf("Y: \n");
+		#endif
+		writeBlockData(fp, jDat, jDat->huffmanY[i], &b, &bitPos);
+		#ifdef DEBUG_HUFFMAN
+			printf("Cb: \n");
+		#endif
+		writeBlockData(fp, jDat, jDat->huffmanCb[i], &b, &bitPos);
+		#ifdef DEBUG_HUFFMAN
+			printf("Cr:\n");
+		#endif
+		writeBlockData(fp, jDat, jDat->huffmanCr[i], &b, &bitPos);
 	}
+}
+
+// bitPos is used to keep track of the bits we are trying to store
+void writeBlockData(FILE *fp, JpgData jDat, HuffSymbol *block, Byte *b, int *bitPos)
+{
+	int length = 0, bitPos2 = 0; // bitPos2 is for the bits we are extracting
+	uint32_t codeValue = 0, mask = 0, bit = 0, bitV = 0;
+	int i = 0;
+
+	while (block[i].nBits != 0){ // finish after writing EOB
+		assert(i < 64);
+		length = block[i].nBits;
+		codeValue = block[i].bits;
+		bitPos2 = 32 - 1;
+		while (length > 0){ // EOB for luminance is not being coded in properly
+			mask = 1;
+			mask <<= bitPos2;
+			bit = (mask & codeValue) ? 1 : 0;
+			if (bit == 0){
+				bitV = 1;
+				bitV <<= (*bitPos);
+				bitV = ~bitV;
+				(*b) &= bitV;
+			}
+
+			else{
+				bitV = bit << (*bitPos);
+				(*b) |= bitV;
+			}
+	
+			length--;
+			(*bitPos) = (*bitPos) - 1;
+			bitPos2--;
+			// determine whether to write the byte to file
+			if (*bitPos < 0){
+				*bitPos = 7;
+				if ((*b) == 0xFF){ // byte stuffing
+					writeByte(fp, 0xFF);
+					writeByte(fp, 0x00);
+				}
+				
+				else{
+					writeByte(fp, (*b));
+					#ifdef DEBUG_HUFFMAN
+						Byte mask2 = 0, bit2 = 0;
+						int j = 0;
+						for (j = 7; j >= 0; j--){
+							mask2 = 1;
+							mask2 <<= j;
+							bit2 = (mask2 & (*b));
+							printf("%d", (bit2) ? 1 : 0);
+						}
+						printf("\n");
+					#endif
+				}
+				(*b) = 0xFF;
+			}
+		}
+	
+		i++;
+	}	
 }
 
 void writeComment(FILE *fp, char *comment, short size)

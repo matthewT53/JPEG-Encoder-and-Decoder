@@ -32,8 +32,7 @@ Note:
 
 Things to do:
 * add down sampling (might need to), current setting is 4:4:4
-* store the quantisation table inside jDat
 * instead of freeing everything at once, free resources when we no longer require them
-* implement an array of 2-d arrays for the codes in the huffman functions
 * lots of magic numbers
+* Some of the jpeg images encoded by this program still has barely noticeable lines and columns.
 	

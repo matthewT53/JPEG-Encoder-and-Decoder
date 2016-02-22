@@ -57,7 +57,7 @@
 // #define DEBUG_ZZ // debugging constant for zig-zag process
 // #define DEBUG_DPCM // debugging constant for DPCM process
 // #define DEBUG_RUN // debugging constant for run length coding
-#define DEBUG_HUFFMAN // debugging constant for huffman encoding
+// #define DEBUG_HUFFMAN // debugging constant for huffman encoding
 
 #define LEVEL_SHIFT
 
@@ -274,26 +274,69 @@ static const uint64_t *AC_codes[2] = {ACLum_HuffCodes, ACChr_HuffCodes};
 Pixel imageToRGB(const char *imageName, int *bufSize)
 {
 	Pixel pixBuf = NULL;
-	int imageSize = 0, bytesRead = 0;
+	int imageSize = 0;
 	FILE *fp = fopen(imageName, "rb");
-	// unsigned char *pBuf = NULL; // store the pixel values (temp)
-	// int i = 0, j = 0;
 	int numberPixels = 0;
+	char *buffer = NULL, *data = NULL;
+	int fs = 0, imageDataOffset = 0, offset = 0;
+	int bitDepth = 0;
+	int width = 0, height = 0;
+	int i = 0;
 	
 	if (fp == NULL){
 		printf("Error opening image file.\n");
 		exit(1); // terminate the process
 	}
 
-	imageSize = determineFileSize(fp) - 54; // det the size that our pixel buffer should be
+	fs = determineFileSize(fp);
+	buffer = malloc(sizeof(char) * (fs + 1));
+	fread(buffer, sizeof(char), fs, fp);
+	assert(buffer != NULL);
+
+	// read in bmp header info
+	data = buffer + 10; // offset to RGB info
+	memcpy(&imageDataOffset, data, 4);
+
+	data = buffer + 18; // offset to width
+	memcpy(&width, data, 4);
+
+	data = buffer + 22; // offset to height
+	memcpy(&height, data, 4);
+
+	data = buffer + 28; // # bits / pixel
+	memcpy(&bitDepth, data, 2);
+	
+	if (bitDepth != 24){
+		printf("Images with 1, 4 or 8 bit depths are not supported.\n");
+		exit(1);
+	}
+
+	#ifdef DEBUG
+		printf("offset = %d, width = %d, height = %d and bitDepth = %d\n", imageDataOffset, width, height, bitDepth);
+	#endif
+
+	imageSize = determineFileSize(fp) - imageDataOffset; // det the size that our pixel buffer should be
 	assert(imageSize > 0); // make sure the image size is > 0
 	numberPixels = ceil(imageSize / 3); // # pixels required
 	pixBuf = newPixBuf(numberPixels); // create an empty pixel buffer
-	fseek(fp, 54, SEEK_SET); // seek 54 bytes from start of file
-	// pBuf = malloc(sizeof(unsigned char) * imageSize); // extract raw pixel data (bytes)
-	bytesRead = fread(pixBuf, sizeof(Colour), imageSize, fp); // read the RGB values into pixBuf
-	if (bytesRead <= 0) { printf("Error reading from file.\n"); }
-	// is the code above dangerous???
+	// fseek(fp, imageDataOffset, SEEK_SET); // seek 54 bytes from start of file
+		
+	// modify the order of the RGB values so the jpeg image can have the correct orientation
+	int pixPos = 0, j = 0; // index for the pixel array
+	for (i = 0; i < height; i++){	
+		offset = fs - (i * width * (bitDepth / 8));
+		for (j = 0; j < (width * 3); j += 3){
+			pixBuf[pixPos].r = buffer[offset + j];
+			pixBuf[pixPos].b = buffer[offset + j + 1];
+			pixBuf[pixPos].g = buffer[offset + j + 2];
+			pixPos++;
+		}
+	}	
+
+	if (pixPos != numberPixels){
+		printf("We have a problem.\n");
+	}
+
 	*bufSize = numberPixels; // set the size of the buffer
 	
 	#ifdef DEBUG

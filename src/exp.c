@@ -24,10 +24,9 @@ int main(void)
 		buffer = malloc(sizeof(unsigned char) * (fs + 1));
 		bytesRead = fread(buffer, sizeof(unsigned char), fs, fp);
 		printf("Bytes read: %d\n", bytesRead);
-		for (i = 1; i < 50; i++){
-			r = rand() % 256;
-			buffer[HEADER_SIZE + i] = r;
-		}
+		buffer[HEADER_SIZE] = 255; // b
+		buffer[HEADER_SIZE + 1] = 0; // g
+		buffer[HEADER_SIZE + 2] = 0; // r
 		
 		new = fopen("exp.bmp", "wb");
 		if (new != NULL){

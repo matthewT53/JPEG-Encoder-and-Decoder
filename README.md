@@ -11,7 +11,7 @@ The jpeg encoder is able to encode an RGB image to a JPEG image. The JPEG data c
 * Quality setting for the JPEG image where 1 < quality < 100
 
 # Current issues:
-* Sometimes random artifacts and lines barely appear in the image.
+* Sometimes random artifacts and lines are barely visible.
 
 # Future work:
 * Add support for Chroma subsampling for better compression. Subsampling modes to add

@@ -9,9 +9,13 @@ The jpeg encoder is able to encode an RGB image to a JPEG image. The JPEG data c
 
 # Features of the encoder:
 * Quality setting for the JPEG image where 1 < quality < 100
+* 3 channels of colour YCbCr.
+* 4:4:4 (No Chroma subsampling)
 
 # Current issues:
 * Sometimes random artifacts and lines are barely visible.
+* Some BMP images have a different ordering for the RGB values which makes encoding the image difficult and sometimes the image has
+  colour variations making it different to the original image. 
 
 # Future work:
 * Add support for Chroma subsampling for better compression. Subsampling modes to add

@@ -323,7 +323,7 @@ Pixel imageToRGB(const char *imageName, int *bufSize)
 		
 	// modify the order of the RGB values so the jpeg image can have the correct orientation
 	int pixPos = 0, j = 0; // index for the pixel array
-	for (i = 0; i < height; i++){	
+	for (i = 1; i <= height; i++){	
 		offset = fs - (i * width * (bitDepth / 8));
 		for (j = 0; j < (width * 3); j += 3){ // sometimes the ordering of the rgb values is different
 			pixBuf[pixPos].b = buffer[offset + j];

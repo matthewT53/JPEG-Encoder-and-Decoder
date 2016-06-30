@@ -576,6 +576,8 @@ void levelShift(JpgData jDat)
 }
 #endif
 
+//TODO subsampling function goes here
+
 // applies dicrete cosine transformation to the image
 void dct(JpgData jDat)
 {
@@ -1642,7 +1644,7 @@ void writeBlockData(FILE *fp, JpgData jDat, HuffSymbol *block, Byte *b, int *bit
 		length = block[i].nBits;
 		codeValue = block[i].bits;
 		bitPos2 = 32 - 1;
-		while (length > 0){ // EOB for luminance is not being coded in properly
+		while (length > 0){
 			mask = 1;
 			mask <<= bitPos2;
 			bit = (mask & codeValue) ? 1 : 0;

@@ -3,19 +3,19 @@ Flat profile:
 Each sample counts as 0.01 seconds.
   %   cumulative   self              self     total           
  time   seconds   seconds    calls  Ts/call  Ts/call  name    
- 91.15      3.03     3.03                             dct
-  2.41      3.11     0.08                             quantise
-  0.90      3.14     0.03                             convertRGBToYCbCr
-  0.90      3.17     0.03                             runLength
-  0.90      3.20     0.03                             writeBlockData
-  0.60      3.22     0.02                             ACHuffmanEncode
-  0.60      3.24     0.02                             form8by8blocks
-  0.60      3.26     0.02                             sanitise
-  0.60      3.28     0.02                             zigZag
-  0.30      3.29     0.01                             dpcm
-  0.30      3.30     0.01                             huffmanEncoding
-  0.30      3.31     0.01                             imageToRGB
-  0.30      3.32     0.01                             levelShift
+ 91.65      2.95     2.95                             dct
+  1.55      3.00     0.05                             writeBlockData
+  1.24      3.04     0.04                             convertRGBToYCbCr
+  0.93      3.07     0.03                             runLength
+  0.93      3.10     0.03                             zigZag
+  0.78      3.13     0.03                             quantise
+  0.62      3.15     0.02                             levelShift
+  0.62      3.17     0.02                             sanitise
+  0.31      3.18     0.01                             DCHuffmanEncode
+  0.31      3.19     0.01                             form8by8blocks
+  0.31      3.20     0.01                             huffmanEncodeValue
+  0.31      3.21     0.01                             huffmanEncoding
+  0.16      3.21     0.01                             buildQuanTables
 
  %         the percentage of the total running time of the
 time       program used by this function.

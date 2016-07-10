@@ -52,8 +52,8 @@
 // #define DEBUG // debugging constant
 // #define DEBUG_PRE // debugging constant for the preprocessing code
 // #define DEBUG_BLOCKS // debugging constant for the code that creates 8x8 blocks
-// #define DEBUG_DCT // debugging constant for the dct process
-// #define DEBUG_QUAN // debugging constant for the quan process
+#define DEBUG_DCT // debugging constant for the dct process
+#define DEBUG_QUAN // debugging constant for the quan process
 // #define DEBUG_ZZ // debugging constant for zig-zag process
 // #define DEBUG_DPCM // debugging constant for DPCM process
 // #define DEBUG_RUN // debugging constant for run length coding

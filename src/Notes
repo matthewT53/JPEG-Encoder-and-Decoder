@@ -10,7 +10,7 @@ Sources that assisted me:
 * http://www.dfrws.org/2008/proceedings/p21-kornblum_pres.pdf -> Quantization quality scaling
 * http://www.dmi.unict.it/~battiato/EI_MOBILE0708/JPEG%20%28Bruna%29.pdf
 * http://cnx.org/contents/eMc9DKWD@5/JPEG-Entropy-Coding -> Zig-zag: "Borrowed" the order matrix
-* http://www.pcs-ip.eu/index.php/main/edu/7 -> zig-zag ordering + entropy encoding 
+* http://www.pcs-ip.eu/index.php/main/edu/7 -> zig-zag ordering + entropy encoding
 * http://users.ece.utexas.edu/~ryerraballi/MSB/pdfs/M4L1.pdf -> DPCM and Run length encoding
 * http://www.impulseadventure.com/photo/jpeg-huffman-coding.html -> Huffman encoding
 * http://www.cs.cf.ac.uk/Dave/MM/BSC_MM_CALLER/PDF/10_CM0340_JPEG.pdf -> good overview of jpeg
@@ -26,9 +26,10 @@ Algorithm: Quantization quality factor
 s = (Q < 50) ? 5000/Q : 200 - 2Q;
 Ts[i] (element in new quan table) = ( S * Tb[i] ( element in original quan table ) + 50 ) / 100;
 
-Note: 
+Note:
 * when Q = 50 there is no change
 * the higher q is, the larger the file size
+* Need to level shift before CHROMA SUBSAMPLE
 
 Things to do:
 * add down sampling (might need to), current setting is 4:4:4
@@ -40,4 +41,8 @@ Making the program more efficient:
 Encoder:
 * Implement the fast DCT algorithm
 * Find a better method to encode the DC and AC values
-	
+
+Bugs and things to work on:
+Chroma Subsampling not working correctly:
+* Verified that the JPEG bytes are being set correctly
+* Could be the chroma subsampling algorithm

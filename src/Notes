@@ -46,3 +46,5 @@ Bugs and things to work on:
 Chroma Subsampling not working correctly:
 * Verified that the JPEG bytes are being set correctly
 * Could be the chroma subsampling algorithm
+* SOLVED: Level shifting must be done before chroma subsampling
+* 4:2:0 is not working properly

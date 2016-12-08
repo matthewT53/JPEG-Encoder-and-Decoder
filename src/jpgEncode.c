@@ -278,7 +278,7 @@ void writeDHT(FILE *fp, JpgData jDat); // store Huffman tables
 void writeFrameHeader(FILE *fp, JpgData jDat); // header for everything between SOI and EOI
 void writeScanHeader(FILE *fp, JpgData jDat); // header for the scan data
 void writeScanData(FILE *fp, JpgData jDat); // entropy encoded data
-void writeBlockData(FILE *fp, JpgData jDat, HuffSymbol *block, Byte *b, int *bitPos);
+void writeBlockData(FILE *fp, HuffSymbol *block, Byte *b, int *bitPos);
 void writeComment(FILE *fp, char *comment, short size); // includes a comment in the binary file
 void writeEOI(FILE *fp); // end of image
 
@@ -1796,25 +1796,25 @@ void writeScanData(FILE *fp, JpgData jDat)
 	int i = 0;
 	// write all the MCU'S into the JPEG file
 	while (curBlock < jDat->numBlocksCb){
-		writeBlockData(fp, jDat, jDat->huffmanY[i++], &b, &bitPos);
+		writeBlockData(fp, jDat->huffmanY[i++], &b, &bitPos);
 		// write this block if for 4:2:2 or 4:2:0 compression
 		if (jDat->ratio >= HORIZONTAL_SUBSAMPLING){
-			writeBlockData(fp, jDat, jDat->huffmanY[i++], &b, &bitPos);
+			writeBlockData(fp, jDat->huffmanY[i++], &b, &bitPos);
 		}
 
 		if (jDat->ratio == HORIZONTAL_VERTICAL_SUBSAMPLING){
-			writeBlockData(fp, jDat, jDat->huffmanY[i++], &b, &bitPos);
-			writeBlockData(fp, jDat, jDat->huffmanY[i++], &b, &bitPos);
+			writeBlockData(fp, jDat->huffmanY[i++], &b, &bitPos);
+			writeBlockData(fp, jDat->huffmanY[i++], &b, &bitPos);
 		}
 
-		writeBlockData(fp, jDat, jDat->huffmanCb[curBlock], &b, &bitPos);
-		writeBlockData(fp, jDat, jDat->huffmanCr[curBlock], &b, &bitPos);
+		writeBlockData(fp, jDat->huffmanCb[curBlock], &b, &bitPos);
+		writeBlockData(fp, jDat->huffmanCr[curBlock], &b, &bitPos);
 		curBlock++;
 	}
 }
 
 // bitPos is used to keep track of the bits we are trying to store
-void writeBlockData(FILE *fp, JpgData jDat, HuffSymbol *block, Byte *b, int *bitPos)
+void writeBlockData(FILE *fp, HuffSymbol *block, Byte *b, int *bitPos)
 {
 	int length = 0, bitPos2 = 0; // bitPos2 is for the bits we are extracting
 	uint32_t codeValue = 0, mask = 0, bit = 0, bitV = 0;

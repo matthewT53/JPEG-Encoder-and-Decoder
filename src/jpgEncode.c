@@ -88,10 +88,6 @@ typedef struct _jpegData{
 	char **CbBlocks;
 	char **CrBlocks;
 
-	char **YBlocksSub;
-	char **CbBlocksSub;
-	char **CrBlocksSub;
-
 	// Chroma subsampling data
 	int ratio;
 
@@ -702,25 +698,8 @@ void chromaSubsample(JpgData jDat)
 	int i = 0, j = 0;
 	int h = jDat->YHeight, w = jDat->YWidth;
 	printf("Height: %d and Width: %d\n", h, w);
-	// chroma subsample 4:2:2
-
-
-	jDat->YBlocksSub = malloc(sizeof(char *) * jDat->YHeight);
-	jDat->CbBlocksSub = malloc(sizeof(char *) * jDat->CbHeight);
-	jDat->CrBlocksSub = malloc(sizeof(char *) * jDat->CrHeight);
-
-	for (i = 0; i < jDat->YHeight; i++){
-		jDat->YBlocksSub[i] = calloc(jDat->YWidth, sizeof(char));
-	}
-
-	for (i = 0; i < jDat->CbHeight; i++){
-		jDat->CbBlocksSub[i] = calloc(jDat->CbWidth, sizeof(char));
-	}
-
-	for (i = 0; i < jDat->CrHeight; i++){
-		jDat->CrBlocksSub[i] = calloc(jDat->CrWidth, sizeof(char));
-	}
-
+	
+	// Subsample 4:2:2
 	if (jDat->ratio == HORIZONTAL_SUBSAMPLING){
 		#ifdef DEBUG_DOWNSAMPLE
 			printf("4:2:2 Subsampling.\n");
@@ -737,14 +716,11 @@ void chromaSubsample(JpgData jDat)
 		printf("Number of blocks: %d\n", jDat->numBlocksCb);
 		for (i = 0; i < h; i++){
 			for (j = 0; j < w; j += 2){
-				jDat->CbBlocksSub[i][j/2] = (jDat->CbBlocks[i][j] + jDat->CbBlocks[i][j + 1]) / 2;
-				jDat->CrBlocksSub[i][j/2] = (jDat->CrBlocks[i][j] + jDat->CrBlocks[i][j + 1]) / 2;
+				jDat->CbBlocks[i][j/2] = (jDat->CbBlocks[i][j] + jDat->CbBlocks[i][j + 1]) / 2;
+				jDat->CrBlocks[i][j/2] = (jDat->CrBlocks[i][j] + jDat->CrBlocks[i][j + 1]) / 2;
 			}
 		}
 
-		// jDat->YBlocksSub = jDat->YBlocks;
-		jDat->CbBlocks = jDat->CbBlocksSub;
-		jDat->CrBlocks = jDat->CrBlocksSub;
 		#ifdef DEBUG_DOWNSAMPLE
 			// print the subsampled block
 			printf("After subsampling:\n");

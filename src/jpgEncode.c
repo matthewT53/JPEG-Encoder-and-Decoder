@@ -52,14 +52,14 @@
 // #define DEBUG // debugging constant
 #define DEBUG_INFO
 #define DEBUG_PRE // debugging constant for the preprocessing code
-#define DEBUG_BLOCKS // debugging constant for the code that creates 8x8 blocks
-#define DEBUG_DOWNSAMPLE
-#define DEBUG_DCT // debugging constant for the dct process
-#define DEBUG_QUAN // debugging constant for the quan process
-#define DEBUG_ZZ // debugging constant for zig-zag process
-#define DEBUG_DPCM // debugging constant for DPCM process
-#define DEBUG_RUN // debugging constant for run length coding
-#define DEBUG_HUFFMAN // debugging constant for huffman encoding
+// #define DEBUG_BLOCKS // debugging constant for the code that creates 8x8 blocks
+// #define DEBUG_DOWNSAMPLE
+// #define DEBUG_DCT // debugging constant for the dct process
+// #define DEBUG_QUAN // debugging constant for the quan process
+// #define DEBUG_ZZ // debugging constant for zig-zag process
+// #define DEBUG_DPCM // debugging constant for DPCM process
+// #define DEBUG_RUN // debugging constant for run length coding
+// #define DEBUG_HUFFMAN // debugging constant for huffman encoding
 
 #define LEVEL_SHIFT
 
@@ -1504,7 +1504,7 @@ void huffmanEncodeValue(HuffSymbol *huffCoeff, int value, int bitSize)
 void writeToFile(JpgData jDat, const char *fileName)
 {
 	FILE *fp = fopen(fileName, "wb");
-	// char *c = "MatthewT53's Jpeg encoder";
+	char *c = "MatthewT53's Jpeg encoder";
 
 	// write JPEG data into
 	if (fp != NULL){
@@ -1515,7 +1515,7 @@ void writeToFile(JpgData jDat, const char *fileName)
 		writeDHT(fp, jDat);
 		writeScanHeader(fp, jDat);
 		writeScanData(fp, jDat);
-		// writeComment(fp, c, (short) strlen(c));
+		writeComment(fp, c, (short) strlen(c));
 		writeEOI(fp);
 
 		fclose(fp);
@@ -1804,6 +1804,7 @@ void writeScanData(FILE *fp, JpgData jDat)
 
 		if (jDat->ratio == HORIZONTAL_VERTICAL_SUBSAMPLING){
 			writeBlockData(fp, jDat, jDat->huffmanY[i++], &b, &bitPos);
+			writeBlockData(fp, jDat, jDat->huffmanY[i++], &b, &bitPos);
 		}
 
 		writeBlockData(fp, jDat, jDat->huffmanCb[curBlock], &b, &bitPos);
@@ -1913,16 +1914,23 @@ void disposeJpgData(JpgData jdata)
 	free(jdata->Cb);
 	free(jdata->Cr);
 
-	// free the 8x8 blocks
-	for (i = 0; i < jdata->height; i++){
+	// free YCbCr and quantization data
+	for (i = 0; i < jdata->YHeight; i++){
 		free(jdata->YBlocks[i]);
-		free(jdata->CbBlocks[i]);
-		free(jdata->CrBlocks[i]);
 		free(jdata->quanY[i]);
+	}
+
+	for (i = 0; i < jdata->CbHeight; i++){
+		free(jdata->CbBlocks[i]);
 		free(jdata->quanCb[i]);
+	}
+
+	for (i = 0; i < jdata->CrHeight; i++){
+		free(jdata->CrBlocks[i]);
 		free(jdata->quanCr[i]);
 	}
 
+	// free entropy encoding information
 	for (i = 0; i < jdata->numBlocksY; i++){
 		free(jdata->huffmanY[i]);
 		free(jdata->encodeY[i]);
@@ -1941,6 +1949,7 @@ void disposeJpgData(JpgData jdata)
 		free(jdata->zzCr[i]);
 	}
 
+	// free everything else
 	free(jdata->YBlocks);
 	free(jdata->CbBlocks);
 	free(jdata->CrBlocks);

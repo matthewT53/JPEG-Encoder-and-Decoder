@@ -50,10 +50,11 @@
 #define EOI_MARKER		0xD9
 
 // #define DEBUG // debugging constant
-#define DEBUG_INFO
-#define DEBUG_PRE // debugging constant for the preprocessing code
+// #define DEBUG_INFO
+// #define DEBUG_PRE // debugging constant for the preprocessing code
 // #define DEBUG_BLOCKS // debugging constant for the code that creates 8x8 blocks
 // #define DEBUG_DOWNSAMPLE
+// #define DEBUG_LEVEL_SHIFT
 // #define DEBUG_DCT // debugging constant for the dct process
 // #define DEBUG_QUAN // debugging constant for the quan process
 // #define DEBUG_ZZ // debugging constant for zig-zag process
@@ -351,7 +352,6 @@ Pixel imageToRGB(const char *imageName, int *bufSize)
 	memcpy(&bitDepth, data, 2);
 
 	if (bitDepth != 24){
-		printf("w = %d and h = %d and bitdepth = %d\n", width, height, bitDepth);
 		printf("Images with 1, 4 or 8 bit depths are not supported.\n");
 		exit(1);
 	}
@@ -667,11 +667,11 @@ void findComponentResolution(int ratio, int *h, int *w)
 // might not be required
 void levelShift(JpgData jDat)
 {
-	printf("[LEVEL] Y:\n");
+	// printf("[LEVEL] Y:\n");
 	levelShiftComponent(jDat->YBlocks, jDat->YHeight, jDat->YWidth);
-	printf("[LEVEL]: Cb:\n");
+	// printf("[LEVEL]: Cb:\n");
 	levelShiftComponent(jDat->CbBlocks, jDat->CbHeight, jDat->CbWidth);
-	printf("[LEVEL]: Cr:\n");
+	// printf("[LEVEL]: Cr:\n");
 	levelShiftComponent(jDat->CrBlocks, jDat->CrHeight, jDat->CrWidth);
 }
 
@@ -682,9 +682,9 @@ void levelShiftComponent(char **component, int h, int w)
 	for (i = 0; i < h; i++){
 		for (j = 0; j < w; j++){
 			component[i][j] -= 128;
-			printf("%5d ", component[i][j]);
+			// printf("%5d ", component[i][j]);
 		}
-		printf("\n");
+		// printf("\n");
 	}
 }
 #endif
@@ -697,7 +697,7 @@ void chromaSubsample(JpgData jDat)
 {
 	int i = 0, j = 0;
 	int h = jDat->YHeight, w = jDat->YWidth;
-	printf("Height: %d and Width: %d\n", h, w);
+	// printf("Height: %d and Width: %d\n", h, w);
 	
 	// Subsample 4:2:2
 	if (jDat->ratio == HORIZONTAL_SUBSAMPLING){
@@ -713,7 +713,7 @@ void chromaSubsample(JpgData jDat)
 		#endif
 
 		// unsigned char value1 = 0, value2 = 0;
-		printf("Number of blocks: %d\n", jDat->numBlocksCb);
+		// printf("Number of blocks: %d\n", jDat->numBlocksCb);
 		for (i = 0; i < h; i++){
 			for (j = 0; j < w; j += 2){
 				jDat->CbBlocks[i][j/2] = (jDat->CbBlocks[i][j] + jDat->CbBlocks[i][j + 1]) / 2;

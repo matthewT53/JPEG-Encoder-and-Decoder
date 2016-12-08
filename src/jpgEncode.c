@@ -1797,7 +1797,12 @@ void writeScanData(FILE *fp, JpgData jDat)
 	// write all the MCU'S into the JPEG file
 	while (curBlock < jDat->numBlocksCb){
 		writeBlockData(fp, jDat, jDat->huffmanY[i++], &b, &bitPos);
-		if (jDat->ratio == HORIZONTAL_SUBSAMPLING){
+		// write this block if for 4:2:2 or 4:2:0 compression
+		if (jDat->ratio >= HORIZONTAL_SUBSAMPLING){
+			writeBlockData(fp, jDat, jDat->huffmanY[i++], &b, &bitPos);
+		}
+
+		if (jDat->ratio == HORIZONTAL_VERTICAL_SUBSAMPLING){
 			writeBlockData(fp, jDat, jDat->huffmanY[i++], &b, &bitPos);
 		}
 

@@ -52,13 +52,13 @@
 // #define DEBUG // debugging constant
 // #define DEBUG_INFO
 // #define DEBUG_PRE // debugging constant for the preprocessing code
-// #define DEBUG_BLOCKS // debugging constant for the code that creates 8x8 blocks
+#define DEBUG_BLOCKS // debugging constant for the code that creates 8x8 blocks
 #define DEBUG_DOWNSAMPLE
-#define DEBUG_LEVEL_SHIFT
+// #define DEBUG_LEVEL_SHIFT
 #define DEBUG_DCT // debugging constant for the dct process
 #define DEBUG_QUAN // debugging constant for the quan process
-// #define DEBUG_ZZ // debugging constant for zig-zag process
-// #define DEBUG_DPCM // debugging constant for DPCM process
+#define DEBUG_ZZ // debugging constant for zig-zag process
+#define DEBUG_DPCM // debugging constant for DPCM process
 #define DEBUG_RUN // debugging constant for run length coding
 #define DEBUG_HUFFMAN // debugging constant for huffman encoding
 
@@ -1816,29 +1816,36 @@ void writeScanData(FILE *fp, JpgData jDat)
 
 	// write all the MCU'S into the JPEG file
 	while (curBlock < jDat->numBlocksCb){
-		printf("i = %d and curBlock = %d\n", i, curBlock);
+		printf("Writing Lum Block: %d\n", i);
 		writeBlockData(fp, jDat->huffmanY[i++], &b, &bitPos);
 		// write this block if for 4:2:2 or 4:2:0 compression
 		if (jDat->ratio >= HORIZONTAL_SUBSAMPLING){
+			printf("Writing Lum Block: %d\n", i);
 			writeBlockData(fp, jDat->huffmanY[i++], &b, &bitPos);
 		}
 
 		if (jDat->ratio == HORIZONTAL_VERTICAL_SUBSAMPLING){
 			// write the MCU's from the same x position just from the next line
 			j = i - 2;
-			printf("i = %d j = %d\n", i, j);
+			printf("Writing Lum Block: %d\n", j + numBlocksWidth);
 			writeBlockData(fp, jDat->huffmanY[j + numBlocksWidth], &b, &bitPos);
+			printf("Writing Lum Block: %d\n", j + numBlocksWidth + 1);
 			writeBlockData(fp, jDat->huffmanY[j + numBlocksWidth + 1], &b, &bitPos);
-			i += 2;
 			if (i % numBlocksWidth == 0){
-				printf("Skipping line below\n");
-				i = numBlocksWidth*2;
+				i = numBlocksWidth * 2;
 			}
 		}
 
+		printf("Writing Cb Block: %d\n", curBlock);
 		writeBlockData(fp, jDat->huffmanCb[curBlock], &b, &bitPos);
+		printf("Writing Cr Block: %d\n", curBlock);
 		writeBlockData(fp, jDat->huffmanCr[curBlock], &b, &bitPos);
 		curBlock++;
+	}
+
+	// write last byte
+	if (b != 0xFF){
+		writeByte(fp, b);
 	}
 }
 

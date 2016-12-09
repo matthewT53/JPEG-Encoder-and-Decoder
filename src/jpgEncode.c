@@ -50,7 +50,7 @@
 #define EOI_MARKER		0xD9
 
 // #define DEBUG // debugging constant
-// #define DEBUG_INFO
+#define DEBUG_INFO
 // #define DEBUG_PRE // debugging constant for the preprocessing code
 #define DEBUG_BLOCKS // debugging constant for the code that creates 8x8 blocks
 #define DEBUG_DOWNSAMPLE
@@ -1522,7 +1522,7 @@ void huffmanEncodeValue(HuffSymbol *huffCoeff, int value, int bitSize)
 void writeToFile(JpgData jDat, const char *fileName)
 {
 	FILE *fp = fopen(fileName, "wb");
-	char *c = "MatthewT53's Jpeg encoder";
+	//char *c = "MatthewT53's Jpeg encoder";
 
 	// write JPEG data into
 	if (fp != NULL){
@@ -1533,7 +1533,7 @@ void writeToFile(JpgData jDat, const char *fileName)
 		writeDHT(fp, jDat);
 		writeScanHeader(fp, jDat);
 		writeScanData(fp, jDat);
-		writeComment(fp, c, (short) strlen(c));
+		// writeComment(fp, c, (short) strlen(c));
 		writeEOI(fp);
 
 		fclose(fp);
@@ -1813,6 +1813,8 @@ void writeScanData(FILE *fp, JpgData jDat)
 	// j = increment for the # blocks written to the file
 	int i = 0, j = 0;
 	int numBlocksWidth = jDat->YWidth / 8;
+
+	printf("Num blocks width: %d\n", numBlocksWidth);
 
 	// write all the MCU'S into the JPEG file
 	while (curBlock < jDat->numBlocksCb){

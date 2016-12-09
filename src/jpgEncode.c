@@ -53,14 +53,14 @@
 // #define DEBUG_INFO
 // #define DEBUG_PRE // debugging constant for the preprocessing code
 // #define DEBUG_BLOCKS // debugging constant for the code that creates 8x8 blocks
-// #define DEBUG_DOWNSAMPLE
-// #define DEBUG_LEVEL_SHIFT
-// #define DEBUG_DCT // debugging constant for the dct process
-// #define DEBUG_QUAN // debugging constant for the quan process
+#define DEBUG_DOWNSAMPLE
+#define DEBUG_LEVEL_SHIFT
+#define DEBUG_DCT // debugging constant for the dct process
+#define DEBUG_QUAN // debugging constant for the quan process
 // #define DEBUG_ZZ // debugging constant for zig-zag process
 // #define DEBUG_DPCM // debugging constant for DPCM process
-// #define DEBUG_RUN // debugging constant for run length coding
-// #define DEBUG_HUFFMAN // debugging constant for huffman encoding
+#define DEBUG_RUN // debugging constant for run length coding
+#define DEBUG_HUFFMAN // debugging constant for huffman encoding
 
 #define LEVEL_SHIFT
 
@@ -667,11 +667,11 @@ void findComponentResolution(int ratio, int *h, int *w)
 // might not be required
 void levelShift(JpgData jDat)
 {
-	// printf("[LEVEL] Y:\n");
+	printf("[LEVEL] Y:\n");
 	levelShiftComponent(jDat->YBlocks, jDat->YHeight, jDat->YWidth);
-	// printf("[LEVEL]: Cb:\n");
+	printf("[LEVEL]: Cb:\n");
 	levelShiftComponent(jDat->CbBlocks, jDat->CbHeight, jDat->CbWidth);
-	// printf("[LEVEL]: Cr:\n");
+	printf("[LEVEL]: Cr:\n");
 	levelShiftComponent(jDat->CrBlocks, jDat->CrHeight, jDat->CrWidth);
 }
 
@@ -682,9 +682,9 @@ void levelShiftComponent(char **component, int h, int w)
 	for (i = 0; i < h; i++){
 		for (j = 0; j < w; j++){
 			component[i][j] -= 128;
-			// printf("%5d ", component[i][j]);
+			printf("%5d ", component[i][j]);
 		}
-		// printf("\n");
+		printf("\n");
 	}
 }
 #endif
@@ -698,7 +698,7 @@ void chromaSubsample(JpgData jDat)
 	int i = 0, j = 0;
 	int h = jDat->YHeight, w = jDat->YWidth;
 	// printf("Height: %d and Width: %d\n", h, w);
-	
+
 	// Subsample 4:2:2
 	if (jDat->ratio == HORIZONTAL_SUBSAMPLING){
 		#ifdef DEBUG_DOWNSAMPLE
@@ -737,7 +737,15 @@ void chromaSubsample(JpgData jDat)
 	else if (jDat->ratio == HORIZONTAL_VERTICAL_SUBSAMPLING){
 		#ifdef DEBUG_DOWNSAMPLE
 			printf("4:2:0 Subsampling.\n");
+			printf("Before subsampling: \n");
+			for (i = 0; i < jDat->YHeight; i++){
+				for (j = 0; j < jDat->YWidth; j++){
+					printf("%5d ", jDat->CbBlocks[i][j]);
+				}
+				printf("\n");
+			}
 		#endif
+
 		for (i = 0; i < h; i += 2){
 			for (j = 0; j < w; j += 2){
 				jDat->CbBlocks[i/2][j/2] = (jDat->CbBlocks[i][j] + jDat->CbBlocks[i][j+1] +
@@ -746,6 +754,16 @@ void chromaSubsample(JpgData jDat)
 											jDat->CrBlocks[i+1][j] + jDat->CrBlocks[i+1][j+1]) / 4;
 			}
 		}
+
+		#ifdef DEBUG_DOWNSAMPLE
+			printf("After subsampling: \n");
+			for (i = 0; i < jDat->CbHeight; i++){
+				for (j = 0; j < jDat->CbWidth; j++){
+					printf("%5d ", jDat->CbBlocks[i][j]);
+				}
+				printf("\n");
+			}
+		#endif
 	}
 
 	else{
@@ -1793,9 +1811,12 @@ void writeScanData(FILE *fp, JpgData jDat)
 	int curBlock = 0;
 	// i = increment for the luminance index
 	// j = increment for the # blocks written to the file
-	int i = 0;
+	int i = 0, j = 0;
+	int numBlocksWidth = jDat->YWidth / 8;
+
 	// write all the MCU'S into the JPEG file
 	while (curBlock < jDat->numBlocksCb){
+		printf("i = %d and curBlock = %d\n", i, curBlock);
 		writeBlockData(fp, jDat->huffmanY[i++], &b, &bitPos);
 		// write this block if for 4:2:2 or 4:2:0 compression
 		if (jDat->ratio >= HORIZONTAL_SUBSAMPLING){
@@ -1803,8 +1824,16 @@ void writeScanData(FILE *fp, JpgData jDat)
 		}
 
 		if (jDat->ratio == HORIZONTAL_VERTICAL_SUBSAMPLING){
-			writeBlockData(fp, jDat->huffmanY[i++], &b, &bitPos);
-			writeBlockData(fp, jDat->huffmanY[i++], &b, &bitPos);
+			// write the MCU's from the same x position just from the next line
+			j = i - 2;
+			printf("i = %d j = %d\n", i, j);
+			writeBlockData(fp, jDat->huffmanY[j + numBlocksWidth], &b, &bitPos);
+			writeBlockData(fp, jDat->huffmanY[j + numBlocksWidth + 1], &b, &bitPos);
+			i += 2;
+			if (i % numBlocksWidth == 0){
+				printf("Skipping line below\n");
+				i = numBlocksWidth*2;
+			}
 		}
 
 		writeBlockData(fp, jDat->huffmanCb[curBlock], &b, &bitPos);

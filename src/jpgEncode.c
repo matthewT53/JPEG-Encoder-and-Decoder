@@ -52,15 +52,15 @@
 // #define DEBUG // debugging constant
 #define DEBUG_INFO
 // #define DEBUG_PRE // debugging constant for the preprocessing code
-#define DEBUG_BLOCKS // debugging constant for the code that creates 8x8 blocks
-#define DEBUG_DOWNSAMPLE
+// #define DEBUG_BLOCKS // debugging constant for the code that creates 8x8 blocks
+// #define DEBUG_DOWNSAMPLE
 // #define DEBUG_LEVEL_SHIFT
 #define DEBUG_DCT // debugging constant for the dct process
 #define DEBUG_QUAN // debugging constant for the quan process
-#define DEBUG_ZZ // debugging constant for zig-zag process
-#define DEBUG_DPCM // debugging constant for DPCM process
-#define DEBUG_RUN // debugging constant for run length coding
-#define DEBUG_HUFFMAN // debugging constant for huffman encoding
+// #define DEBUG_ZZ // debugging constant for zig-zag process
+// #define DEBUG_DPCM // debugging constant for DPCM process
+// #define DEBUG_RUN // debugging constant for run length coding
+// #define DEBUG_HUFFMAN // debugging constant for huffman encoding
 
 #define LEVEL_SHIFT
 
@@ -462,11 +462,18 @@ void preprocessJpg(JpgData jDat, Pixel rgb, unsigned int numPixels)
 	}
 
 	// set the number of blocks in each component
-	jDat->numBlocksY = (jDat->YHeight / 8) * (jDat->YWidth / 8);
-	jDat->numBlocksCb = (jDat->CbHeight / 8) * (jDat->CbWidth / 8);
-	jDat->numBlocksCr = (jDat->CrHeight / 8) * (jDat->CrWidth / 8);
+	#ifdef DEBUG_INFO
+		printf("Cbheight / 8 = %.2f\n", (double) jDat->CbHeight / 8);
+		printf("CbWdth / 8 = %.2f\n", (double) jDat->CbWidth / 8);
+	#endif
+	jDat->numBlocksY = ( (double) jDat->YHeight / 8 * (double) jDat->YWidth / 8 );
+	jDat->numBlocksCb = ( (double) jDat->CbHeight / 8 * (double) jDat->CbWidth / 8 );
+	jDat->numBlocksCr = ( (double) jDat->CrHeight / 8 * (double) jDat->CrWidth / 8 );
 
 	#ifdef DEBUG_INFO
+		printf("YHeight: %d and YWidth: %d\n", jDat->YHeight, jDat->YWidth);
+		printf("CbHeight: %d and CbWidth: %d\n", jDat->CbHeight, jDat->CbWidth);
+		printf("CrHeight: %d and CrWidth: %d\n", jDat->CrHeight, jDat->CrWidth);
 		printf("Y: numblocks = %d\n", jDat->numBlocksY);
 		printf("Cb: numBlocks = %d\n", jDat->numBlocksCb);
 		printf("Cr: numBlocks = %d\n", jDat->numBlocksCr);
@@ -667,11 +674,17 @@ void findComponentResolution(int ratio, int *h, int *w)
 // might not be required
 void levelShift(JpgData jDat)
 {
-	printf("[LEVEL] Y:\n");
+	#ifdef DEBUG_LEVEL_SHIFT
+		printf("[LEVEL] Y:\n");
+	#endif
 	levelShiftComponent(jDat->YBlocks, jDat->YHeight, jDat->YWidth);
-	printf("[LEVEL]: Cb:\n");
+	#ifdef DEBUG_LEVEL_SHIFT
+		printf("[LEVEL]: Cb:\n");
+	#endif
 	levelShiftComponent(jDat->CbBlocks, jDat->CbHeight, jDat->CbWidth);
-	printf("[LEVEL]: Cr:\n");
+	#ifdef DEBUG_LEVEL_SHIFT
+		printf("[LEVEL]: Cr:\n");
+	#endif
 	levelShiftComponent(jDat->CrBlocks, jDat->CrHeight, jDat->CrWidth);
 }
 
@@ -682,9 +695,13 @@ void levelShiftComponent(char **component, int h, int w)
 	for (i = 0; i < h; i++){
 		for (j = 0; j < w; j++){
 			component[i][j] -= 128;
-			printf("%5d ", component[i][j]);
+			#ifdef DEBUG_LEVEL_SHIFT
+				printf("%5d ", component[i][j]);
+			#endif
 		}
-		printf("\n");
+		#ifdef DEBUG_LEVEL_SHIFT
+			printf("\n");
+		#endif
 	}
 }
 #endif
@@ -805,7 +822,7 @@ void dct(JpgData jDat)
 	#endif
 	for (curBlock = 1; curBlock <= jDat->numBlocksY; curBlock++){
 		#ifdef DEBUG_DCT
-			printf("Block number: %d\n", curBlock);
+			printf("Block number (Y): %d\n", curBlock);
 		#endif
 		blockToCoords(curBlock, sX, sY, jDat->YWidth); // convert block number into coordinates
 		dctTransformBlock(jDat->YBlocks, sX, sY, dctBlock); // transform the block
@@ -821,7 +838,7 @@ void dct(JpgData jDat)
 	// perform DCT on the Cb component
 	for (curBlock = 1; curBlock <= jDat->numBlocksCb; curBlock++){
 		#ifdef DEBUG_DCT
-			printf("Block number: %d\n", curBlock);
+			printf("Block number (Cb): %d\n", curBlock);
 		#endif
 		blockToCoords(curBlock, sX, sY, jDat->CbWidth);
 		dctTransformBlock(jDat->CbBlocks, sX, sY, dctBlock);
@@ -837,7 +854,7 @@ void dct(JpgData jDat)
 	// perform DCT on the Cr component
 	for (curBlock = 1; curBlock <= jDat->numBlocksCr; curBlock++){
 		#ifdef DEBUG_DCT
-			printf("Block number: %d\n", curBlock);
+			printf("Block number (Cr): %d\n", curBlock);
 		#endif
 		blockToCoords(curBlock, sX, sY, jDat->CrWidth);
 		dctTransformBlock(jDat->CrBlocks, sX, sY, dctBlock);
@@ -947,6 +964,9 @@ void buildQuanTables(JpgData jDat)
 void quantise(double dctBlock[][BLOCK_SIZE], int **quantisedComp, unsigned char quanTable[][BLOCK_SIZE], int sx, int sy)
 {
 	int i = 0, j = 0, m = 0, n = 0;
+	#ifdef DEBUG_QUAN
+		printf("StartX = %d and startY = %d\n", sx, sy);
+	#endif
 	// quantise the matrices
 	for (i = 0, m = sy; i < BLOCK_SIZE; i++, m++){
 		for (j = 0, n = sx; j < BLOCK_SIZE; j++, n++){
@@ -1815,6 +1835,7 @@ void writeScanData(FILE *fp, JpgData jDat)
 	int numBlocksWidth = jDat->YWidth / 8;
 
 	printf("Num blocks width: %d\n", numBlocksWidth);
+	printf("Num blocks Cb: %d\n", jDat->numBlocksCb);
 
 	// write all the MCU'S into the JPEG file
 	while (curBlock < jDat->numBlocksCb){

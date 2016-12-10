@@ -52,9 +52,10 @@
 // #define DEBUG // debugging constant
 #define DEBUG_INFO
 // #define DEBUG_PRE // debugging constant for the preprocessing code
-// #define DEBUG_BLOCKS // debugging constant for the code that creates 8x8 blocks
-// #define DEBUG_DOWNSAMPLE
-// #define DEBUG_LEVEL_SHIFT
+#define DEBUG_BLOCKS // debugging constant for the code that creates 8x8 blocks
+#define DEBUG_PADDING
+#define DEBUG_DOWNSAMPLE
+#define DEBUG_LEVEL_SHIFT
 #define DEBUG_DCT // debugging constant for the dct process
 #define DEBUG_QUAN // debugging constant for the quan process
 // #define DEBUG_ZZ // debugging constant for zig-zag process
@@ -155,6 +156,7 @@ void levelShift(JpgData jDat); // subtract 128 from YCbCr channels to make DCT e
 void determineResolutions(JpgData jDat);
 void findComponentResolution(int ratio, int *h, int *w);
 void levelShiftComponent(char **component, int h, int w);
+void addPadding(JpgData jDat); // determines if the width and height of each component are divisible by 8
 
 // Chroma-subsampling
 /*
@@ -247,8 +249,12 @@ void writeToFile(JpgData jDat, const char *fileName);
 /* ================== Utility functions ========================= */
 
 // changing width and height is ok since we can later modify it again in the header of the image
-void fillWidth(JpgData jDat, int nEdges); // extends the width of the image
-void fillHeight(JpgData jDat, int nEdges); // extends the height of the image
+
+// Splits a colour component (Y, Cb or Cr) into 8 x 8 blocks
+void form8by8blocksComponent(char **component, char *colourData, int width, int height, int paddingWidth, int paddingHeight);
+int determinePaddingSize(int length); // determines how many lines to add for width or height to make dimensions divisible by 8
+void fillHeight(char **colourComponent, int height, int width, int nEdges); // performs padding for the height
+void fillWidth(char **colourComponent, int height, int width, int nEdges); // performs padding for the width
 
 // DCT helper functions
 void dctTransformBlock(char **component, int *x, int *y, double block[][BLOCK_SIZE]);
@@ -405,9 +411,8 @@ void encodeRGBToJpgDisk(const char *jpgFile, Pixel rgbBuffer, unsigned int numPi
 	jD->quality = quality;
 	jD->ratio = sampleRatio;
 
-	jD->YWidth = jD->YHeight = 0;
-	jD->CbWidth = jD->CbHeight = 0;
-	jD->CrWidth = jD->CrHeight = 0;
+	jD->YHeight = jD->CbHeight = jD->CrHeight = height;
+	jD->YWidth = jD->CbWidth = jD->CrWidth = width;
 	jD->numBlocksY = jD->numBlocksCb = jD->numBlocksCr = 0;
 
 	if (jD != NULL){
@@ -447,25 +452,19 @@ void preprocessJpg(JpgData jDat, Pixel rgb, unsigned int numPixels)
 	convertRGBToYCbCr(jDat, rgb, numPixels); // change the colour space
 	form8by8blocks(jDat); // split the image into 8x8 blocks
 
-	// give each component the orignal resolution
-	jDat->CbHeight = jDat->CrHeight = jDat->YHeight;
-	jDat->CbWidth = jDat->CrWidth = jDat->YWidth;
-
 	#ifdef LEVEL_SHIFT
 	levelShift(jDat); // subtract 128 from each value
 	#endif
-
+	
 	// user wants to chroma subsample the JPEG image
 	if (jDat->ratio != NO_CHROMA_SUBSAMPLING){
 		determineResolutions(jDat); // determines the resolution of each compoenent based on the sampling ratio
 		chromaSubsample(jDat); // chroma subsample the JPEG image
 	}
 
+	addPadding(jDat);
+
 	// set the number of blocks in each component
-	#ifdef DEBUG_INFO
-		printf("Cbheight / 8 = %.2f\n", (double) jDat->CbHeight / 8);
-		printf("CbWdth / 8 = %.2f\n", (double) jDat->CbWidth / 8);
-	#endif
 	jDat->numBlocksY = ( (double) jDat->YHeight / 8 * (double) jDat->YWidth / 8 );
 	jDat->numBlocksCb = ( (double) jDat->CbHeight / 8 * (double) jDat->CbWidth / 8 );
 	jDat->numBlocksCr = ( (double) jDat->CrHeight / 8 * (double) jDat->CrWidth / 8 );
@@ -511,37 +510,58 @@ void convertRGBToYCbCr(JpgData jDat, Pixel rgb, unsigned int numPixels)
 	#endif
 }
 
+void addPadding(JpgData jDat)
+{
+	int fillHeightY = determinePaddingSize(jDat->YHeight);
+	int fillWidthY = determinePaddingSize(jDat->YWidth);
+	int fillHeightCb = determinePaddingSize(jDat->CbHeight);
+	int fillWidthCb = determinePaddingSize(jDat->CbWidth);
+	int fillHeightCr = determinePaddingSize(jDat->CrHeight);
+	int fillWidthCr = determinePaddingSize(jDat->CrWidth);
+
+	#ifdef DEBUG_PADDING
+		printf("fhY = %d and fwY = %d\n", fillHeightY, fillWidthY);
+		printf("fhCb = %d and fwCb = %d\n", fillHeightCb, fillWidthCb);
+		printf("fhCr = %d and fwCr = %d\n", fillHeightCr, fillWidthCr);
+	#endif
+
+	if (fillHeightY){
+		fillHeight(jDat->YBlocks, jDat->YHeight, jDat->YWidth, fillHeightY); 
+		jDat->YHeight += fillHeightY; 
+	}
+ 
+	if (fillWidthY){
+		fillWidth(jDat->YBlocks, jDat->YHeight, jDat->YWidth, fillWidthY);
+		jDat->YWidth += fillWidthY;
+	}
+ 
+	if (fillHeightCb){
+		fillHeight(jDat->CbBlocks, jDat->CbHeight, jDat->CbWidth, fillHeightCb);
+		jDat->CbHeight += fillHeightCb; 
+	} 
+
+	if (fillWidthCb){ 
+		fillWidth(jDat->CbBlocks, jDat->CbHeight, jDat->CbWidth, fillWidthCb); 
+		jDat->CbWidth += fillWidthCb; 
+	}
+
+	 
+	if (fillHeightCr){ 
+		fillHeight(jDat->CrBlocks, jDat->CrHeight, jDat->CrWidth, fillHeightCr); 
+		jDat->CrHeight += fillHeightCr;
+	} 
+
+	if (fillWidthCr){ 
+		fillWidth(jDat->CrBlocks, jDat->CrHeight, jDat->CrWidth, fillWidthCr); 
+		jDat->CrWidth += fillWidthCr;
+	} 
+}
+
 // convert the image into 8 by 8 blocks
 void form8by8blocks(JpgData jDat)
 {
-	int fillWEdges = FALSE;
-	int fillHEdges = FALSE;
-	int extraSpaceW = 0, extraSpaceH = 0;
-	int totalH = 0, totalW = 0;
+	int totalH = jDat->height, totalW = jDat->width;
 	int i = 0, j = 0, k = 0;
-
-	// printf("Not yet implemented 8x8 blocks\n");
-	// test width and height for divisibility by 8
-	if (jDat->width % 8 != 0){ fillWEdges = TRUE; }
-	if (jDat->height % 8 != 0) { fillHEdges = TRUE; }
-
-	// determine how much we need to fill
-	if (fillWEdges){
-		extraSpaceW = (8 - (jDat->width % 8)) * jDat->width; // # pixels in width * number of columns (add to right of iamge)
-	}
-
-	if (fillHEdges){
-		extraSpaceH = (8 - (jDat->height % 8)) * jDat->height; // add to bottom
-	}
-
-	// calculate the total height and width of the image that is divisible by 8
-	totalH = jDat->height + extraSpaceH;
-	totalW = jDat->width + extraSpaceW;
-
-	#ifdef DEBUG_BLOCKS
-		printf("fillWEdge = %d and fillHEdge = %d\n", fillWEdges, fillHEdges);
-		printf("totalW = %d and totalH = %d\n", totalW, totalH);
-	#endif
 
 	// get memory to store our blocks
 	jDat->YBlocks = malloc(sizeof(char *) * (totalH));
@@ -567,15 +587,6 @@ void form8by8blocks(JpgData jDat)
 			jDat->CrBlocks[i][j] = jDat->Cr[k];
 			k++;
 		}
-	}
-
-	// add the necessary edges to the image
-	if (fillWEdges){
-		fillWidth(jDat, extraSpaceW);
-	}
-
-	if (fillHEdges){
-		fillHeight(jDat, extraSpaceH);
 	}
 
 	// set the resolution for the luminance component
@@ -610,34 +621,35 @@ void form8by8blocks(JpgData jDat)
 	// printf("Finished output.\n");
 }
 
-void fillWidth(JpgData jDat, int nEdges)
+int determinePaddingSize(int length)
+{
+	int paddingLength = 0;
+	if (length % 8 != 0){
+		paddingLength = 8 - (length % 8);
+	}
+	
+	return paddingLength;
+}
+
+void fillHeight(char **colourComponent, int height, int width, int nEdges)
 {
 	//  extend the bottom width of the image
-	int h = jDat->height;
 	int i = 0;
-	char *baseLineY = jDat->YBlocks[h - 1];
-	char *baseLineCb = jDat->CbBlocks[h - 1];
-	char *baseLineCr = jDat->CrBlocks[h - 1];
+	char *bottomLine = colourComponent[height - 1];
 
-	for (i = h; i < h + nEdges; i++){
-		memcpy(jDat->YBlocks[i], baseLineY, jDat->width);
-		memcpy(jDat->CbBlocks[i], baseLineCb, jDat->width);
-		memcpy(jDat->CrBlocks[i], baseLineCr, jDat->width);
+	for (i = height; i < height + nEdges; i++){
+		memcpy(colourComponent[i], bottomLine, width);
 	}
 }
 
-void fillHeight(JpgData jDat, int nEdges)
+void fillWidth(char **colourComponent, int height, int width, int nEdges)
 {
-	// printf("Not yet implemented.\n");
-	int w = jDat->width;
 	int i = 0, j = 0;
-	int baseIndexW = w - 1;
+	int baseIndexW = width - 1;
 
-	for (i = w; i < w + nEdges; i++){
-		for (j = 0; j < jDat->height; j++){
-			jDat->YBlocks[j][i] = jDat->YBlocks[j][baseIndexW];
-			jDat->CbBlocks[j][i] = jDat->CbBlocks[j][baseIndexW];
-			jDat->CrBlocks[j][i] = jDat->CrBlocks[j][baseIndexW];
+	for (i = width; i < width + nEdges; i++){
+		for (j = 0; j < height; j++){
+			colourComponent[j][i] = colourComponent[j][baseIndexW];
 		}
 	}
 }

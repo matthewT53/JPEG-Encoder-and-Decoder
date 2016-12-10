@@ -1811,7 +1811,7 @@ void writeScanData(FILE *fp, JpgData jDat)
 	int curBlock = 0;
 	// i = increment for the luminance index
 	// j = increment for the # blocks written to the file
-	int i = 0, j = 0;
+	int i = 0, j = 0, k = 2;
 	int numBlocksWidth = jDat->YWidth / 8;
 
 	printf("Num blocks width: %d\n", numBlocksWidth);
@@ -1834,7 +1834,8 @@ void writeScanData(FILE *fp, JpgData jDat)
 			printf("Writing Lum Block: %d\n", j + numBlocksWidth + 1);
 			writeBlockData(fp, jDat->huffmanY[j + numBlocksWidth + 1], &b, &bitPos);
 			if (i % numBlocksWidth == 0){
-				i = numBlocksWidth * 2;
+				i = numBlocksWidth * k; // need to fix this up
+				k += 2;
 			}
 		}
 

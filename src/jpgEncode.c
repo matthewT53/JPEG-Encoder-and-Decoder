@@ -52,12 +52,12 @@
 // #define DEBUG // debugging constant
 #define DEBUG_INFO
 // #define DEBUG_PRE // debugging constant for the preprocessing code
-#define DEBUG_BLOCKS // debugging constant for the code that creates 8x8 blocks
-#define DEBUG_PADDING
-#define DEBUG_DOWNSAMPLE
-#define DEBUG_LEVEL_SHIFT
-#define DEBUG_DCT // debugging constant for the dct process
-#define DEBUG_QUAN // debugging constant for the quan process
+// #define DEBUG_BLOCKS // debugging constant for the code that creates 8x8 blocks
+// #define DEBUG_PADDING
+// #define DEBUG_DOWNSAMPLE
+// #define DEBUG_LEVEL_SHIFT
+// #define DEBUG_DCT // debugging constant for the dct process
+// #define DEBUG_QUAN // debugging constant for the quan process
 // #define DEBUG_ZZ // debugging constant for zig-zag process
 // #define DEBUG_DPCM // debugging constant for DPCM process
 // #define DEBUG_RUN // debugging constant for run length coding
@@ -455,19 +455,19 @@ void preprocessJpg(JpgData jDat, Pixel rgb, unsigned int numPixels)
 	#ifdef LEVEL_SHIFT
 	levelShift(jDat); // subtract 128 from each value
 	#endif
-	
+
 	// user wants to chroma subsample the JPEG image
 	if (jDat->ratio != NO_CHROMA_SUBSAMPLING){
 		determineResolutions(jDat); // determines the resolution of each compoenent based on the sampling ratio
 		chromaSubsample(jDat); // chroma subsample the JPEG image
 	}
 
-	addPadding(jDat);
-
 	// set the number of blocks in each component
 	jDat->numBlocksY = ( (double) jDat->YHeight / 8 * (double) jDat->YWidth / 8 );
 	jDat->numBlocksCb = ( (double) jDat->CbHeight / 8 * (double) jDat->CbWidth / 8 );
 	jDat->numBlocksCr = ( (double) jDat->CrHeight / 8 * (double) jDat->CrWidth / 8 );
+
+	addPadding(jDat);
 
 	#ifdef DEBUG_INFO
 		printf("YHeight: %d and YWidth: %d\n", jDat->YHeight, jDat->YWidth);
@@ -526,35 +526,35 @@ void addPadding(JpgData jDat)
 	#endif
 
 	if (fillHeightY){
-		fillHeight(jDat->YBlocks, jDat->YHeight, jDat->YWidth, fillHeightY); 
-		jDat->YHeight += fillHeightY; 
+		fillHeight(jDat->YBlocks, jDat->YHeight, jDat->YWidth, fillHeightY);
+		jDat->YHeight += fillHeightY;
 	}
- 
+
 	if (fillWidthY){
 		fillWidth(jDat->YBlocks, jDat->YHeight, jDat->YWidth, fillWidthY);
 		jDat->YWidth += fillWidthY;
 	}
- 
+
 	if (fillHeightCb){
 		fillHeight(jDat->CbBlocks, jDat->CbHeight, jDat->CbWidth, fillHeightCb);
-		jDat->CbHeight += fillHeightCb; 
-	} 
-
-	if (fillWidthCb){ 
-		fillWidth(jDat->CbBlocks, jDat->CbHeight, jDat->CbWidth, fillWidthCb); 
-		jDat->CbWidth += fillWidthCb; 
+		jDat->CbHeight += fillHeightCb;
 	}
 
-	 
-	if (fillHeightCr){ 
-		fillHeight(jDat->CrBlocks, jDat->CrHeight, jDat->CrWidth, fillHeightCr); 
-		jDat->CrHeight += fillHeightCr;
-	} 
+	if (fillWidthCb){
+		fillWidth(jDat->CbBlocks, jDat->CbHeight, jDat->CbWidth, fillWidthCb);
+		jDat->CbWidth += fillWidthCb;
+	}
 
-	if (fillWidthCr){ 
-		fillWidth(jDat->CrBlocks, jDat->CrHeight, jDat->CrWidth, fillWidthCr); 
+
+	if (fillHeightCr){
+		fillHeight(jDat->CrBlocks, jDat->CrHeight, jDat->CrWidth, fillHeightCr);
+		jDat->CrHeight += fillHeightCr;
+	}
+
+	if (fillWidthCr){
+		fillWidth(jDat->CrBlocks, jDat->CrHeight, jDat->CrWidth, fillWidthCr);
 		jDat->CrWidth += fillWidthCr;
-	} 
+	}
 }
 
 // convert the image into 8 by 8 blocks
@@ -627,7 +627,7 @@ int determinePaddingSize(int length)
 	if (length % 8 != 0){
 		paddingLength = 8 - (length % 8);
 	}
-	
+
 	return paddingLength;
 }
 
@@ -1851,22 +1851,23 @@ void writeScanData(FILE *fp, JpgData jDat)
 
 	// write all the MCU'S into the JPEG file
 	while (curBlock < jDat->numBlocksCb){
-		printf("Writing Lum Block: %d\n", i);
+		printf("Writing Lum Block (1): %d\n", i);
 		writeBlockData(fp, jDat->huffmanY[i++], &b, &bitPos);
 		// write this block if for 4:2:2 or 4:2:0 compression
 		if (jDat->ratio >= HORIZONTAL_SUBSAMPLING){
-			printf("Writing Lum Block: %d\n", i);
+			printf("Writing Lum Block (2): %d\n", i);
 			writeBlockData(fp, jDat->huffmanY[i++], &b, &bitPos);
 		}
 
 		if (jDat->ratio == HORIZONTAL_VERTICAL_SUBSAMPLING){
 			// write the MCU's from the same x position just from the next line
 			j = i - 2;
-			printf("Writing Lum Block: %d\n", j + numBlocksWidth);
+			printf("Writing Lum Block (3): %d\n", j + numBlocksWidth);
 			writeBlockData(fp, jDat->huffmanY[j + numBlocksWidth], &b, &bitPos);
-			printf("Writing Lum Block: %d\n", j + numBlocksWidth + 1);
+			printf("Writing Lum Block (4): %d\n", j + numBlocksWidth + 1);
 			writeBlockData(fp, jDat->huffmanY[j + numBlocksWidth + 1], &b, &bitPos);
 			if (i % numBlocksWidth == 0){
+				printf("k = %d\n", k);
 				i = numBlocksWidth * k; // need to fix this up
 				k += 2;
 			}

@@ -47,4 +47,4 @@ Chroma Subsampling not working correctly:
 * Verified that the JPEG bytes are being set correctly
 * Could be the chroma subsampling algorithm
 * SOLVED: Level shifting must be done before chroma subsampling
-* 4:2:0 is not working properly
+* 4:2:0 is not working properly => 1080 / 240 = 4.5. We always get to the last row and hence can't encode 4:2:0 properly since there is no row below.

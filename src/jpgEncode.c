@@ -1845,6 +1845,7 @@ void writeScanData(FILE *fp, JpgData jDat)
 	// j = increment for the # blocks written to the file
 	int i = 0, j = 0, k = 2;
 	int numBlocksWidth = jDat->YWidth / 8;
+	int indexNextLine = 0;
 
 	printf("Num blocks width: %d\n", numBlocksWidth);
 	printf("Num blocks Cb: %d\n", jDat->numBlocksCb);
@@ -1861,11 +1862,20 @@ void writeScanData(FILE *fp, JpgData jDat)
 
 		if (jDat->ratio == HORIZONTAL_VERTICAL_SUBSAMPLING){
 			// write the MCU's from the same x position just from the next line
-			j = i - 2;
-			printf("Writing Lum Block (3): %d\n", j + numBlocksWidth);
-			writeBlockData(fp, jDat->huffmanY[j + numBlocksWidth], &b, &bitPos);
-			printf("Writing Lum Block (4): %d\n", j + numBlocksWidth + 1);
-			writeBlockData(fp, jDat->huffmanY[j + numBlocksWidth + 1], &b, &bitPos);
+			j = i - 2;	
+
+			if (j + numBlocksWidth >= jDat->numBlocksY){
+				indexNextLine = j;
+			}
+
+			else{
+				indexNextLine = j + numBlocksWidth;
+			}
+	
+			printf("Writing Lum Block (3): %d\n", indexNextLine);
+			writeBlockData(fp, jDat->huffmanY[indexNextLine], &b, &bitPos);
+			printf("Writing Lum Block (4): %d\n", indexNextLine + 1);
+			writeBlockData(fp, jDat->huffmanY[indexNextLine + 1], &b, &bitPos);
 			if (i % numBlocksWidth == 0){
 				printf("k = %d\n", k);
 				i = numBlocksWidth * k; // need to fix this up

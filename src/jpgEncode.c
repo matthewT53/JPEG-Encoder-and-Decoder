@@ -53,7 +53,7 @@
 #define DEBUG_INFO
 // #define DEBUG_PRE // debugging constant for the preprocessing code
 // #define DEBUG_BLOCKS // debugging constant for the code that creates 8x8 blocks
-// #define DEBUG_PADDING
+#define DEBUG_PADDING
 // #define DEBUG_DOWNSAMPLE
 // #define DEBUG_LEVEL_SHIFT
 // #define DEBUG_DCT // debugging constant for the dct process

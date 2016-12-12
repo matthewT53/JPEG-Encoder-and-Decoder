@@ -462,12 +462,12 @@ void preprocessJpg(JpgData jDat, Pixel rgb, unsigned int numPixels)
 		chromaSubsample(jDat); // chroma subsample the JPEG image
 	}
 
+	addPadding(jDat);
+
 	// set the number of blocks in each component
 	jDat->numBlocksY = ( (double) jDat->YHeight / 8 * (double) jDat->YWidth / 8 );
 	jDat->numBlocksCb = ( (double) jDat->CbHeight / 8 * (double) jDat->CbWidth / 8 );
 	jDat->numBlocksCr = ( (double) jDat->CrHeight / 8 * (double) jDat->CrWidth / 8 );
-
-	addPadding(jDat);
 
 	#ifdef DEBUG_INFO
 		printf("YHeight: %d and YWidth: %d\n", jDat->YHeight, jDat->YWidth);
@@ -1862,16 +1862,9 @@ void writeScanData(FILE *fp, JpgData jDat)
 
 		if (jDat->ratio == HORIZONTAL_VERTICAL_SUBSAMPLING){
 			// write the MCU's from the same x position just from the next line
-			j = i - 2;	
+			j = i - 2;
+			indexNextLine = j + numBlocksWidth;
 
-			if (j + numBlocksWidth >= jDat->numBlocksY){
-				indexNextLine = j;
-			}
-
-			else{
-				indexNextLine = j + numBlocksWidth;
-			}
-	
 			printf("Writing Lum Block (3): %d\n", indexNextLine);
 			writeBlockData(fp, jDat->huffmanY[indexNextLine], &b, &bitPos);
 			printf("Writing Lum Block (4): %d\n", indexNextLine + 1);
@@ -1879,6 +1872,9 @@ void writeScanData(FILE *fp, JpgData jDat)
 			if (i % numBlocksWidth == 0){
 				printf("k = %d\n", k);
 				i = numBlocksWidth * k; // need to fix this up
+				if (i + numBlocksWidth >= jDat->numBlocksY){
+					i -= numBlocksWidth;
+				}
 				k += 2;
 			}
 		}

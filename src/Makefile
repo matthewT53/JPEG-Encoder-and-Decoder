@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-Wall -Werror -std=c99 -c
+CFLAGS=-Wall -Werror -std=c99 -c -g
 
 all: jpeg
 

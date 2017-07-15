@@ -51,17 +51,17 @@
 
 // #define DEBUG // debugging constant
 #define DEBUG_INFO
-// #define DEBUG_PRE // debugging constant for the preprocessing code
-// #define DEBUG_BLOCKS // debugging constant for the code that creates 8x8 blocks
+#define DEBUG_PRE // debugging constant for the preprocessing code
+#define DEBUG_BLOCKS // debugging constant for the code that creates 8x8 blocks
 #define DEBUG_PADDING
-// #define DEBUG_DOWNSAMPLE
-// #define DEBUG_LEVEL_SHIFT
-// #define DEBUG_DCT // debugging constant for the dct process
-// #define DEBUG_QUAN // debugging constant for the quan process
-// #define DEBUG_ZZ // debugging constant for zig-zag process
-// #define DEBUG_DPCM // debugging constant for DPCM process
-// #define DEBUG_RUN // debugging constant for run length coding
-// #define DEBUG_HUFFMAN // debugging constant for huffman encoding
+#define DEBUG_DOWNSAMPLE
+#define DEBUG_LEVEL_SHIFT
+#define DEBUG_DCT // debugging constant for the dct process
+#define DEBUG_QUAN // debugging constant for the quan process
+#define DEBUG_ZZ // debugging constant for zig-zag process
+#define DEBUG_DPCM // debugging constant for DPCM process
+#define DEBUG_RUN // debugging constant for run length coding
+#define DEBUG_HUFFMAN // debugging constant for huffman encoding
 
 #define LEVEL_SHIFT
 
@@ -131,6 +131,7 @@ typedef struct _jpegData{
 	Symbol **encodeCb;
 	Symbol **encodeCr;
 
+	// huffman encoded binary strings
 	HuffSymbol **huffmanY;
 	HuffSymbol **huffmanCb;
 	HuffSymbol **huffmanCr;
@@ -706,7 +707,7 @@ void levelShiftComponent(char **component, int h, int w)
 
 	for (i = 0; i < h; i++){
 		for (j = 0; j < w; j++){
-			component[i][j] -= 128;
+			component[i][j] -= 130;
 			#ifdef DEBUG_LEVEL_SHIFT
 				printf("%5d ", component[i][j]);
 			#endif
@@ -774,13 +775,21 @@ void chromaSubsample(JpgData jDat)
 				printf("\n");
 			}
 		#endif
-
+/*
+		for (i = 0; i < h; i += 2){
+		    for (j = 0; j < w; j += 2){
+			    jDat->CbBlocks[i/2][j/2] = jDat->CbBlocks[i][j];
+		        jDat->CrBlocks[i/2][j/2] = jDat->CrBlocks[i][j];
+		    }
+		}
+*/
 		for (i = 0; i < h; i += 2){
 			for (j = 0; j < w; j += 2){
 				jDat->CbBlocks[i/2][j/2] = (jDat->CbBlocks[i][j] + jDat->CbBlocks[i][j+1] +
 											jDat->CbBlocks[i+1][j] + jDat->CbBlocks[i+1][j+1]) / 4;
 				jDat->CrBlocks[i/2][j/2] = (jDat->CrBlocks[i][j] + jDat->CrBlocks[i][j+1] +
 											jDat->CrBlocks[i+1][j] + jDat->CrBlocks[i+1][j+1]) / 4;
+
 			}
 		}
 
@@ -884,6 +893,11 @@ void dctTransformBlock(char **component, int *x, int *y, double block[][BLOCK_SI
 	int startX = x[0], endX = x[1];
 	int startY = y[0], endY = y[1];
 	double dctCoef = 0;
+
+	#ifdef DEBUG_DCT
+		printf("startX = %d and endX = %d\n", startX, endX);
+		printf("startY = %d and endY = %d\n", startY, endY);
+	#endif
 
 	for (u = 0; u < BLOCK_SIZE; u++){ // calculate DCT for G(u,v)
 		for (v = 0; v < BLOCK_SIZE; v++){
@@ -1841,49 +1855,70 @@ void writeScanData(FILE *fp, JpgData jDat)
 	Byte b = 0xFF;
 	int bitPos = 7;
 	int curBlock = 0;
-	// i = increment for the luminance index
-	// j = increment for the # blocks written to the file
-	int i = 0, j = 0, k = 2;
-	int numBlocksWidth = jDat->YWidth / 8;
-	int indexNextLine = 0;
+	int i = 0;
+	int numBlocksWidth = (jDat->YWidth / 8);
+	int max = numBlocksWidth;
 
 	printf("Num blocks width: %d\n", numBlocksWidth);
 	printf("Num blocks Cb: %d\n", jDat->numBlocksCb);
 
 	// write all the MCU'S into the JPEG file
-	while (curBlock < jDat->numBlocksCb){
-		printf("Writing Lum Block (1): %d\n", i);
-		writeBlockData(fp, jDat->huffmanY[i++], &b, &bitPos);
-		// write this block if for 4:2:2 or 4:2:0 compression
-		if (jDat->ratio >= HORIZONTAL_SUBSAMPLING){
-			printf("Writing Lum Block (2): %d\n", i);
-			writeBlockData(fp, jDat->huffmanY[i++], &b, &bitPos);
-		}
-
-		if (jDat->ratio == HORIZONTAL_VERTICAL_SUBSAMPLING){
-			// write the MCU's from the same x position just from the next line
-			j = i - 2;
-			indexNextLine = j + numBlocksWidth;
-
-			printf("Writing Lum Block (3): %d\n", indexNextLine);
-			writeBlockData(fp, jDat->huffmanY[indexNextLine], &b, &bitPos);
-			printf("Writing Lum Block (4): %d\n", indexNextLine + 1);
-			writeBlockData(fp, jDat->huffmanY[indexNextLine + 1], &b, &bitPos);
-			if (i % numBlocksWidth == 0){
-				printf("k = %d\n", k);
-				i = numBlocksWidth * k; // need to fix this up
-				if (i + numBlocksWidth >= jDat->numBlocksY){
-					i -= numBlocksWidth;
-				}
-				k += 2;
+	switch (jDat->ratio){
+		// 4:2:2 subsampling
+		case HORIZONTAL_SUBSAMPLING:
+			while (curBlock < jDat->numBlocksCb){
+				writeBlockData(fp, jDat->huffmanY[i++], &b, &bitPos);
+				writeBlockData(fp, jDat->huffmanY[i++], &b, &bitPos);
+				writeBlockData(fp, jDat->huffmanCb[curBlock], &b, &bitPos);
+				writeBlockData(fp, jDat->huffmanCr[curBlock], &b, &bitPos);
+				curBlock++;
 			}
-		}
 
-		printf("Writing Cb Block: %d\n", curBlock);
-		writeBlockData(fp, jDat->huffmanCb[curBlock], &b, &bitPos);
-		printf("Writing Cr Block: %d\n", curBlock);
-		writeBlockData(fp, jDat->huffmanCr[curBlock], &b, &bitPos);
-		curBlock++;
+			break;
+
+		// 4:2:0 subsampling
+		case HORIZONTAL_VERTICAL_SUBSAMPLING:
+			while (curBlock < jDat->numBlocksCb){
+				writeBlockData(fp, jDat->huffmanY[i], &b, &bitPos);
+				writeBlockData(fp, jDat->huffmanY[i + 1], &b, &bitPos);
+
+				// write the same blocks but on the next row
+				if (i + numBlocksWidth < jDat->numBlocksY){
+					writeBlockData(fp, jDat->huffmanY[i + numBlocksWidth], &b, &bitPos);
+					writeBlockData(fp, jDat->huffmanY[i + numBlocksWidth + 1], &b, &bitPos);
+				}
+
+				i += 2;
+				printf("i = %d, max = %d\n", i, max);
+				if (i == max){
+					i += numBlocksWidth;
+					max += (2 * numBlocksWidth);
+				}
+
+/*
+				0 .... 239
+				240 .. 479
+				480 .. 718 -> should be 719
+				720 .. 959
+*/
+				// write the colour components
+				writeBlockData(fp, jDat->huffmanCb[curBlock], &b, &bitPos);
+				writeBlockData(fp, jDat->huffmanCr[curBlock], &b, &bitPos);
+				curBlock++;
+			}
+
+			break;
+
+		// no chroma subsampling
+		default:
+			while (curBlock < jDat->numBlocksY){
+				writeBlockData(fp, jDat->huffmanY[curBlock], &b, &bitPos);
+				writeBlockData(fp, jDat->huffmanCb[curBlock], &b, &bitPos);
+				writeBlockData(fp, jDat->huffmanCr[curBlock], &b, &bitPos);
+				curBlock++;
+			}
+
+			break;
 	}
 
 	// write last byte

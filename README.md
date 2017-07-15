@@ -11,6 +11,7 @@ The jpeg encoder is able to encode an RGB image to a JPEG image. The JPEG data c
 * Convert BMP to JPEG.
 * Quality setting for the JPEG image where 1 < quality < 100
 * 3 channels of colour YCbCr.
+* Chroma subsampling: 4:4:4 and 4:2:2
 
 # Current issues:
 * Sometimes random artifacts and lines are barely visible.

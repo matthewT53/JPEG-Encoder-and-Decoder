@@ -25,7 +25,7 @@ typedef struct _bitmap {
 	int error; 		        // error code associated with reading the file
 } Bitmap;
 
-BmpImage openBitmap(const char *filename)
+BmpImage bmp_OpenBitmap(const char *filename)
 {
 	FILE *fp = NULL;
 	BmpImage b = NULL;
@@ -75,12 +75,14 @@ BmpImage openBitmap(const char *filename)
 		else{
 			b->error = BMP_FILE_DOESNT_EXIST;
 		}
+
+		close(fp);
 	}
 
 	return b;
 }
 
-Byte *getColourData(BmpImage b, int *size)
+Byte *bmp_GetColourData(BmpImage b, int *size)
 {
 	FILE *fp = NULL;
 	Byte *buffer = NULL;
@@ -88,6 +90,37 @@ Byte *getColourData(BmpImage b, int *size)
 	
 }
 
+void bmp_ShowBmpInfo(BmpImage b)
+{
+	printf("[BMP Info]:\n");
+	printf("Filename: %s\n", b->filename);
+	printf("File size: %d\n", b->fileSize);
+	printf("Height: %d\n", b->height);
+	printf("Width: %d\n", b->width);
+	printf("Bit depth: %d\n", b->bitDepth);
+}
+
+void bmp_GetLastError(BmpImage b)
+{
+	switch (b->error){
+		case BMP_FILE_DOESNT_EXIST:
+			printf("%s doesn't exist\n", b->filename);
+			break;
+
+		case BMP_READ_FAILED:
+			printf("Reading BMP image failed\n");
+			break;
+
+		default: 
+			printf("No error.\n");
+			break;
+	}
+}
+
+int bmp_GetFileSize(BmpImage b)
+{
+	return b->fileSize;
+}
 
 // helper function that determines the size of a file
 int determineFileSize(FILE *f)

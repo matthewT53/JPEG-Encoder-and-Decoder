@@ -26,7 +26,7 @@ typedef unsigned char Byte;
 
 	If NULL is returned then there wasn't enough memory to allocate for the BmpImage
 */
-BmpImage openBitmap(const char *file);
+BmpImage bmp_OpenBitmap(const char *file);
 
 /*
 	Retrives the RGB values from the BMP image
@@ -38,21 +38,26 @@ BmpImage openBitmap(const char *file);
 	A pointer to an integer that contains the size of the buffer is passed back to the caller
 	
 */
-Byte *getColourData(BmpImage b, int *numPixels);
+Byte *bmp_GetColourData(BmpImage b, int *numPixels);
 
 /*
 	Dumps information about the BMP file
 */
-void showBmpInfo(BmpImage b);
+void bmp_ShowBmpInfo(BmpImage b);
 
 /*
 	Determines the file size of the Bitmap image
 */
-int getFileSize(BmpImage b);
+int bmp_GetFileSize(BmpImage b);
+
+/*
+	Displays the last error that occured
+*/
+void bmp_GetLastError(BmpImage b);
 
 /*
 	Frees all memory used by the bitmap image
 */
-void destroyBitmap(BmpImage b);
+void bmp_DestroyBitmap(BmpImage b);
 
 #endif

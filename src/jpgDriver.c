@@ -12,8 +12,10 @@
 int main(void)
 {
 	int size = 0;
-	Pixel rgbBuf = imageToRGB("images/cam.bmp", &size);
-	encodeRGBToJpgDisk("results/new.jpg", rgbBuf, size, 64, 64, 50, HORIZONTAL_VERTICAL_SUBSAMPLING);
+	Pixel rgbBuf = imageToRGB("images/redFlowers.bmp", &size);
+	encodeRGBToJpgDisk("results/new_hv.jpg", rgbBuf, size, 1920, 1080, 50, HORIZONTAL_VERTICAL_SUBSAMPLING);
+	encodeRGBToJpgDisk("results/new_h.jpg", rgbBuf, size, 1920, 1080, 50, HORIZONTAL_SUBSAMPLING);
+	encodeRGBToJpgDisk("results/new_no.jpg", rgbBuf, size, 1920, 1080, 50, NO_CHROMA_SUBSAMPLING);
 
 	free(rgbBuf);
 	return EXIT_SUCCESS;

@@ -50,18 +50,18 @@
 #define EOI_MARKER		0xD9
 
 // #define DEBUG // debugging constant
-#define DEBUG_INFO
-#define DEBUG_PRE // debugging constant for the preprocessing code
-#define DEBUG_BLOCKS // debugging constant for the code that creates 8x8 blocks
-#define DEBUG_PADDING
+// #define DEBUG_INFO
+// #define DEBUG_PRE // debugging constant for the preprocessing code
+// #define DEBUG_BLOCKS // debugging constant for the code that creates 8x8 blocks
+// #define DEBUG_PADDING
 #define DEBUG_DOWNSAMPLE
-#define DEBUG_LEVEL_SHIFT
-#define DEBUG_DCT // debugging constant for the dct process
-#define DEBUG_QUAN // debugging constant for the quan process
-#define DEBUG_ZZ // debugging constant for zig-zag process
-#define DEBUG_DPCM // debugging constant for DPCM process
-#define DEBUG_RUN // debugging constant for run length coding
-#define DEBUG_HUFFMAN // debugging constant for huffman encoding
+// #define DEBUG_LEVEL_SHIFT
+// #define DEBUG_DCT // debugging constant for the dct process
+// #define DEBUG_QUAN // debugging constant for the quan process
+// #define DEBUG_ZZ // debugging constant for zig-zag process
+// #define DEBUG_DPCM // debugging constant for DPCM process
+// #define DEBUG_RUN // debugging constant for run length coding
+// #define DEBUG_HUFFMAN // debugging constant for huffman encoding
 
 #define LEVEL_SHIFT
 
@@ -320,7 +320,7 @@ static const uint8_t *DC_codes[2] = {DCLum_HuffCodes, DCChr_HuffCodes};
 static const uint64_t *AC_codes[2] = {ACLum_HuffCodes, ACChr_HuffCodes};
 
 // pattern for creating zig-zag vectors
-static Coordinate c[NUM_COEFFICIENTS];
+Coordinate c[NUM_COEFFICIENTS];
 
 // can easily be adapted to other image formats other than BMP - mainly used for testing
 Pixel imageToRGB(const char *imageName, int *bufSize)
@@ -415,6 +415,9 @@ void encodeRGBToJpgDisk(const char *jpgFile, Pixel rgbBuffer, unsigned int numPi
 	jD->YHeight = jD->CbHeight = jD->CrHeight = height;
 	jD->YWidth = jD->CbWidth = jD->CrWidth = width;
 	jD->numBlocksY = jD->numBlocksCb = jD->numBlocksCr = 0;
+
+	// store this table in vector to write to the file
+	loadCoordinates(c);
 
 	if (jD != NULL){
 		// preprocess the image data
@@ -707,7 +710,7 @@ void levelShiftComponent(char **component, int h, int w)
 
 	for (i = 0; i < h; i++){
 		for (j = 0; j < w; j++){
-			component[i][j] -= 130;
+			component[i][j] -= 128;
 			#ifdef DEBUG_LEVEL_SHIFT
 				printf("%5d ", component[i][j]);
 			#endif
@@ -732,11 +735,20 @@ void chromaSubsample(JpgData jDat)
 	// Subsample 4:2:2
 	if (jDat->ratio == HORIZONTAL_SUBSAMPLING){
 		#ifdef DEBUG_DOWNSAMPLE
-			printf("4:2:2 Subsampling.\n");
+			printf("4:2:2 Before Subsampling.\n");
 			// print the original first block
-			for (i = 0; i < jDat->YHeight; i++){
-				for (j = 0; j < jDat->YWidth; j++){
+			printf("Before subsampling Cb: \n");
+			for (i = 0; i < 2; i++){
+				for (j = 0; j < 2; j++){
 					printf("%5d", jDat->CbBlocks[i][j]);
+				}
+				printf("\n");
+			}
+
+			printf("Before subsampling Cr: \n");
+			for (i = 0; i < 2; i++){
+				for (j = 0; j < 2; j++){
+					printf("%5d ", jDat->CrBlocks[i][j]);
 				}
 				printf("\n");
 			}
@@ -753,10 +765,19 @@ void chromaSubsample(JpgData jDat)
 
 		#ifdef DEBUG_DOWNSAMPLE
 			// print the subsampled block
+			printf("4:2:2 After Subsampling.\n");
 			printf("After subsampling:\n");
-			for (i = 0; i < jDat->CbHeight; i++){
-				for (j = 0; j < jDat->CbWidth; j++){
+			for (i = 0; i < 2; i++){
+				for (j = 0; j < 1; j++){
 					printf("%5d", jDat->CbBlocks[i][j]);
+				}
+				printf("\n");
+			}
+
+			printf("Before subsampling Cr: \n");
+			for (i = 0; i < 2; i++){
+				for (j = 0; j < 1; j++){
+					printf("%5d ", jDat->CrBlocks[i][j]);
 				}
 				printf("\n");
 			}
@@ -767,10 +788,18 @@ void chromaSubsample(JpgData jDat)
 	else if (jDat->ratio == HORIZONTAL_VERTICAL_SUBSAMPLING){
 		#ifdef DEBUG_DOWNSAMPLE
 			printf("4:2:0 Subsampling.\n");
-			printf("Before subsampling: \n");
-			for (i = 0; i < jDat->YHeight; i++){
-				for (j = 0; j < jDat->YWidth; j++){
+			printf("Before subsampling Cb: \n");
+			for (i = 0; i < 2; i++){
+				for (j = 0; j < 2; j++){
 					printf("%5d ", jDat->CbBlocks[i][j]);
+				}
+				printf("\n");
+			}
+
+			printf("Before subsampling Cr: \n");
+			for (i = 0; i < 2; i++){
+				for (j = 0; j < 2; j++){
+					printf("%5d ", jDat->CrBlocks[i][j]);
 				}
 				printf("\n");
 			}
@@ -785,19 +814,28 @@ void chromaSubsample(JpgData jDat)
 */
 		for (i = 0; i < h; i += 2){
 			for (j = 0; j < w; j += 2){
-				jDat->CbBlocks[i/2][j/2] = (jDat->CbBlocks[i][j] + jDat->CbBlocks[i][j+1] +
-											jDat->CbBlocks[i+1][j] + jDat->CbBlocks[i+1][j+1]) / 4;
-				jDat->CrBlocks[i/2][j/2] = (jDat->CrBlocks[i][j] + jDat->CrBlocks[i][j+1] +
-											jDat->CrBlocks[i+1][j] + jDat->CrBlocks[i+1][j+1]) / 4;
+				// printf("%d + %d + %d + %d", )
+				jDat->CbBlocks[i/2][j/2] = ceil( (float) (jDat->CbBlocks[i][j] + jDat->CbBlocks[i][j+1] +
+											jDat->CbBlocks[i+1][j] + jDat->CbBlocks[i+1][j+1]) / 4.0);
+				jDat->CrBlocks[i/2][j/2] = ceil( (float) (jDat->CrBlocks[i][j] + jDat->CrBlocks[i][j+1] +
+											jDat->CrBlocks[i+1][j] + jDat->CrBlocks[i+1][j+1]) / 4.0);
 
 			}
 		}
 
 		#ifdef DEBUG_DOWNSAMPLE
-			printf("After subsampling: \n");
-			for (i = 0; i < jDat->CbHeight; i++){
-				for (j = 0; j < jDat->CbWidth; j++){
+			printf("After subsampling Cb: \n");
+			for (i = 0; i < 1; i++){
+				for (j = 0; j < 1; j++){
 					printf("%5d ", jDat->CbBlocks[i][j]);
+				}
+				printf("\n");
+			}
+
+			printf("After subsampling Cr: \n");
+			for (i = 0; i < 1; i++){
+				for (j = 0; j < 1; j++){
+					printf("%5d ", jDat->CrBlocks[i][j]);
 				}
 				printf("\n");
 			}
@@ -959,9 +997,6 @@ void buildQuanTables(JpgData jDat)
 			jDat->DQT_TableChr[i][j] = ((s*quanMatrixChr[i][j] + 50) / 100);
 		}
 	}
-
-	// store this table in vector to write to the file
-	loadCoordinates(c);
 
 	for (i = 0; i < NUM_COEFFICIENTS; i++){
 		y = c[i].y;
@@ -1883,13 +1918,13 @@ void writeScanData(FILE *fp, JpgData jDat)
 				writeBlockData(fp, jDat->huffmanY[i + 1], &b, &bitPos);
 
 				// write the same blocks but on the next row
-				if (i + numBlocksWidth < jDat->numBlocksY){
-					writeBlockData(fp, jDat->huffmanY[i + numBlocksWidth], &b, &bitPos);
-					writeBlockData(fp, jDat->huffmanY[i + numBlocksWidth + 1], &b, &bitPos);
-				}
+				//if (i + numBlocksWidth < jDat->numBlocksY){
+				writeBlockData(fp, jDat->huffmanY[i + numBlocksWidth], &b, &bitPos);
+				writeBlockData(fp, jDat->huffmanY[i + numBlocksWidth + 1], &b, &bitPos);
+				//}
 
 				i += 2;
-				printf("i = %d, max = %d\n", i, max);
+				// printf("i = %d, max = %d\n", i, max);
 				if (i == max){
 					i += numBlocksWidth;
 					max += (2 * numBlocksWidth);

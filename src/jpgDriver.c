@@ -7,16 +7,26 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "include/jpgEncode.h"
+// #include "include/jpgEncode.h"
+#include "bitmap.h"
 
 int main(void)
 {
+	int i = 0;
 	int size = 0;
-	Pixel rgbBuf = imageToRGB("images/redFlowers.bmp", &size);
-	encodeRGBToJpgDisk("results/new_hv.jpg", rgbBuf, size, 1920, 1080, 50, HORIZONTAL_VERTICAL_SUBSAMPLING);
-	encodeRGBToJpgDisk("results/new_h.jpg", rgbBuf, size, 1920, 1080, 50, HORIZONTAL_SUBSAMPLING);
-	encodeRGBToJpgDisk("results/new_no.jpg", rgbBuf, size, 1920, 1080, 50, NO_CHROMA_SUBSAMPLING);
+	Byte *data = NULL;
+	
+	BmpImage b = bmp_OpenBitmap("images/redFlowers.bmp");
+	bmp_ShowBmpInfo(b);
+	bmp_GetLastError(b);
+	data = bmp_GetColourData(b, &size);
+	
+	for (i = 0; i < size; i++){
+		printf("%d\n", data[i]); 
+	}
 
-	free(rgbBuf);
+	bmp_GetLastError(b);
+	free(data);
+
 	return EXIT_SUCCESS;
 }

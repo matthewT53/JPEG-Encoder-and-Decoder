@@ -14,9 +14,9 @@
 #define BMP_SUCCESS 0
 #define BMP_FILE_DOESNT_EXIST 1
 #define BMP_READ_FAILED 2
+#define BMP_FAILED_ALLOCATE_BUFFER 3
 
 typedef struct _bitmap *BmpImage;
-typedef struct _pixel *ColourData;
 typedef unsigned char Byte;
 
 /*
@@ -39,6 +39,16 @@ BmpImage bmp_OpenBitmap(const char *file);
 	
 */
 Byte *bmp_GetColourData(BmpImage b, int *numPixels);
+
+/*
+	Returns the width of the image
+*/
+int bmp_GetWidth(BmpImage b);
+
+/*
+	Returns the height of the image
+*/
+int bmp_GetHeight(BmpImage b);
 
 /*
 	Dumps information about the BMP file

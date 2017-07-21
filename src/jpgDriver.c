@@ -14,19 +14,23 @@ int main(void)
 {
 	int i = 0;
 	int size = 0;
-	Byte *data = NULL;
-	
-	BmpImage b = bmp_OpenBitmap("images/redFlowers.bmp");
-	bmp_ShowBmpInfo(b);
-	bmp_GetLastError(b);
-	data = bmp_GetColourData(b, &size);
-	
-	for (i = 0; i < size; i++){
-		printf("%d\n", data[i]); 
-	}
+	Byte *r = NULL, *b = NULL, *g = NULL;
 
-	bmp_GetLastError(b);
-	free(data);
+	BmpImage bmp = bmp_OpenBitmap("images/redFlowers.bmp");
+	bmp_ShowBmpInfo(bmp);
+	bmp_GetLastError(bmp);
+
+	r = bmp_GetRed(bmp);
+	b = bmp_GetBlue(bmp);
+	g = bmp_GetGreen(bmp);
+
+	//for (i = 0; i < bmp_GetNumPixels(bmp); i++){
+	//	printf("[i] = %d, [R]: %d, [G]: %d [B]: %d\n", i, r[i], g[i], b[i]);
+	//}
+
+	bmp_GetLastError(bmp);
+
+	bmp_DestroyBitmap(bmp);
 
 	return EXIT_SUCCESS;
 }

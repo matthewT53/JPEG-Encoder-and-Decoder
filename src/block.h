@@ -22,7 +22,7 @@ double getValueBlock(Block b, int x, int y);
 /*
     Sets the value at a specific position (x,y)
 */
-void setValueBlock(Block b, int x, int y);
+void setValueBlock(Block b, int x, int y, int v);
 
 /*
     Displays the contents of the blocks

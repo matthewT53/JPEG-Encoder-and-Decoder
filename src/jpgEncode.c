@@ -76,7 +76,7 @@ void encode_bmp_to_jpeg(const char *input, const char *output, int quality, int 
 		j_data->output_filename = output;
 
 		// convert RGb to YCbCr
-		preprocess_jpeg(j_data);
+		preprocess_jpeg(j_data, input);
 
 		// downsample the image
 		chroma_subsample(j_data);

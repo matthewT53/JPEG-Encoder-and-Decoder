@@ -29,16 +29,19 @@ typedef unsigned char Byte;
 BmpImage bmp_OpenBitmap(const char *file);
 
 /*
-	Retrives the RGB values from the BMP image
-
-	A buffer that contains RGB values is returned, make sure to free this buffer when you are done.
-
-	The order in the buffer is: R,G,B,R,G,B,R,G,B....R,G,B
-
-	A pointer to an integer that contains the size of the buffer is passed back to the caller
-	
+    Returns the red channel data
 */
-Byte *bmp_GetColourData(BmpImage b, int *numPixels);
+Byte *bmp_GetRed(BmpImage b);
+
+/*
+    Returns the green channel data
+*/
+Byte *bmp_GetGreen(BmpImage b);
+
+/*
+    Returns the blue channel data
+*/
+Byte *bmp_GetBlue(BmpImage b);
 
 /*
 	Returns the width of the image
@@ -49,6 +52,11 @@ int bmp_GetWidth(BmpImage b);
 	Returns the height of the image
 */
 int bmp_GetHeight(BmpImage b);
+
+/*
+    Returns the number of pixels in the image
+*/
+int bmp_GetNumPixels(BmpImage b);
 
 /*
 	Dumps information about the BMP file

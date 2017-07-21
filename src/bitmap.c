@@ -10,23 +10,32 @@
 
 #include "bitmap.h"
 
-#define MAX_LEN 500
+#define BMP_MAX_LEN 500
 
 /*
 	Helper functions
 */
 
+// stores the RGB values in seperate channels
+void bmp_GetColourData(BmpImage b);
+
 // determines the size of a file
 int determineFileSize(FILE *f);
 
 typedef struct _bitmap {
-	char filename[MAX_LEN]; // name of the bitmap file
+	char filename[BMP_MAX_LEN]; // name of the bitmap file
 	int fileSize;			// size of the bitmap file
 	int offsetRGB; 			// offset to the RGB data
 	int width;              // width of the image
 	int height;             // height of the image
 	short bitDepth;	        // bit depth of the image
+	int numPixels; 			// number of pixels
 	int error; 		        // error code associated with reading the file
+
+	// data for each of the colour channels
+	Byte *red;
+	Byte *green;
+	Byte *blue;
 } Bitmap;
 
 BmpImage bmp_OpenBitmap(const char *filename)
@@ -50,7 +59,7 @@ BmpImage bmp_OpenBitmap(const char *filename)
 			buffer = malloc(sizeof(Byte) * (fs + 1));
 
 			b->fileSize = fs;
-			memset(b->filename, 0, MAX_LEN);
+			memset(b->filename, 0, BMP_MAX_LEN);
 			strncpy(b->filename, filename, strlen(filename));
 
 			// check if the buffer for reading has been created properly
@@ -69,6 +78,10 @@ BmpImage bmp_OpenBitmap(const char *filename)
 
 				data = buffer + 28; // # bits / pixel
 				memcpy(&b->bitDepth, data, sizeof(short));
+
+				b->numPixels = b->width * b->height;
+
+				bmp_GetColourData(b);
 			}
 
 			else{
@@ -86,24 +99,26 @@ BmpImage bmp_OpenBitmap(const char *filename)
 	return b;
 }
 
-Byte *bmp_GetColourData(BmpImage b, int *size)
+void bmp_GetColourData(BmpImage b)
 {
 	FILE *fp = NULL;
 	Byte *buffer = NULL;
-	Byte *pixels = NULL;
 	int n = 0;
 	int i = 0, j = 0; // index for the pixel array
 	int fs = 0, offset = 0;
 	int numPixels = 0;
 
-	numPixels = b->width * b->height * 3;
-	fs = b->fileSize;
-	buffer = malloc(sizeof(Byte) * fs);
-	pixels = malloc(sizeof(Byte) * numPixels);
+	numPixels = b->numPixels;
+	fs 		  = b->fileSize;
+	buffer    = malloc(sizeof(Byte) * fs);
 
-	*size = numPixels;
+	// allocate memory for each of the colour channels
+	b->red   = malloc(sizeof(Byte) * numPixels);
+	b->green = malloc(sizeof(Byte) * numPixels);
+	b->blue  = malloc(sizeof(Byte) * numPixels);
 
-	if (buffer != NULL && pixels != NULL){
+
+	if (buffer != NULL && b->red != NULL && b->green != NULL && b->blue != NULL){
 		fp = fopen(b->filename, "rb");
 
 		if (fp != NULL){
@@ -114,9 +129,10 @@ Byte *bmp_GetColourData(BmpImage b, int *size)
 			for (i = 1; i <= b->height; i++){
 				offset = fs - (i * b->width * (b->bitDepth / 8));
 				for (j = 0; j < (b->width * 3); j += 3){ // sometimes the ordering of the rgb values is different
-					pixels[n++] = buffer[offset + j];     // r
-					pixels[n++] = buffer[offset + j + 1]; // g
-					pixels[n++] = buffer[offset + j + 2]; // b
+					b->red[n]   = buffer[offset + j];     // r
+				 	b->green[n] = buffer[offset + j + 1]; // g
+					b->blue[n]  = buffer[offset + j + 2]; // b
+					n++;
 				}
 			}
 		}
@@ -133,8 +149,21 @@ Byte *bmp_GetColourData(BmpImage b, int *size)
 	}
 
 	free(buffer);
+}
 
-	return pixels;
+Byte *bmp_GetRed(BmpImage b)
+{
+	return b->red;
+}
+
+Byte *bmp_GetGreen(BmpImage b)
+{
+	return b->green;
+}
+
+Byte *bmp_GetBlue(BmpImage b)
+{
+	return b->blue;
 }
 
 void bmp_ShowBmpInfo(BmpImage b)
@@ -157,6 +186,11 @@ int bmp_GetHeight(BmpImage b)
 	return b->height;
 }
 
+int bmp_GetNumPixels(BmpImage b)
+{
+	return b->numPixels;
+}
+
 void bmp_GetLastError(BmpImage b)
 {
 	switch (b->error){
@@ -177,6 +211,20 @@ void bmp_GetLastError(BmpImage b)
 int bmp_GetFileSize(BmpImage b)
 {
 	return b->fileSize;
+}
+
+void bmp_DestroyBitmap(BmpImage b)
+{
+	int i = 0;
+
+	for (i = 0; i < BMP_MAX_LEN; i++){
+		b->filename[i] = 0;
+	}
+
+	free(b->red);
+	free(b->green);
+	free(b->blue);
+	free(b);
 }
 
 // helper function that determines the size of a file

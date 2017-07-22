@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "bitmap.h"
+#include "include/bitmap.h"
 
 #define BMP_MAX_LEN 500
 
@@ -200,6 +200,10 @@ void bmp_GetLastError(BmpImage b)
 
 		case BMP_READ_FAILED:
 			printf("Reading BMP image failed\n");
+			break;
+
+		case BMP_FAILED_ALLOCATE_BUFFER:
+			printf("Failed to allocate a buffer.\n");
 			break;
 
 		default:

@@ -7,7 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "block.h"
+#include "include/block.h"
 
 #define NUM_COEFFICIENTS 64
 #define NUM_COEFFICIENTS_ROW 8
@@ -27,7 +27,26 @@ float getValueBlock(Block b, int x, int y)
 	return b->values[y * NUM_COEFFICIENTS_ROW + x];
 }
 
+void setValueBlock(Block b, int x, int y, float v)
+{
+	b->values[y * NUM_COEFFICIENTS_ROW + x] = v;
+}
+
+void showBlock(Block b)
+{
+	int i = 0;
+	for (i = 0; i < NUM_COEFFICIENTS; i++){
+		if (i % NUM_COEFFICIENTS_ROW == 0){
+			printf("\n");
+		}
+
+		printf("%5.2f ", b->values[i]);
+	}
+
+	printf("\n");
+}
+
 void destroyBlock(Block b)
 {
-	fee(b);
+	free(b);
 }

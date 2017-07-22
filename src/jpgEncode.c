@@ -1,38 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "jpgEncode.h"
-#include "preprocess.h"
-#include "block.h"
-
-typedef unsigned char Byte;
-
-typedef struct _jpeg_data{
-	// output filename
-	char *output_filename;
-
-	// properties of the JPEG image
-	int width;
-	int height;
-
-	// these variables control the quality of the image
-	int sampling_ratio;
-	int quality;
-
-	// number of blocks in each colour channel
-	int num_blocks_Y;
-	int num_blocks_Cb;
-	int num_blocks_Cr;
-
-	// values of each colour channel
-	Block *Y;
-	Block *Cb;
-	Block *Cr;
-
-	// blocks to store the chroma
-	Block *downsample_Cb;
-	Block *downsample_Cr;
-} JpegData;
+#include "include/jpgEncode.h"
+#include "include/preprocess.h"
+#include "include/block.h"
 
 /* ======================================= Main JPEG compression functions ============================== */
 
@@ -68,17 +39,24 @@ void encode_bmp_to_jpeg(const char *input, const char *output, int quality, int 
 {
 	JpgData j_data = NULL;
 
-	j_data = create_jpeg_data
+	j_data = create_jpeg_data();
 
 	if (j_data != NULL){
 		j_data->sample_ratio = sample_ratio;
 		j_data->quality = quality;
-		j_data->output_filename = output;
+		j_data->output_filename = (char *) output;
+		j_data->input_filename =  (char *) input;
 
 		// convert RGb to YCbCr
-		preprocess_jpeg(j_data, input);
+		preprocess_jpeg(j_data);
 
 		// downsample the image
 		chroma_subsample(j_data);
 	}
+}
+
+JpgData create_jpeg_data(void)
+{
+	JpgData j_data = malloc(sizeof(JpegData));
+	return j_data;
 }

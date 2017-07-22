@@ -7,12 +7,44 @@
 #ifndef JPG_ENC
 #define JPG_ENC
 
+#include "block.h"
+
 // Chroma Subsampling constants
 #define NO_CHROMA_SUBSAMPLING 0 // no chroma subsampling
 #define HORIZONTAL_SUBSAMPLING 1 // 4:2:2 chroma subsampling
 #define HORIZONTAL_VERTICAL_SUBSAMPLING 2 // 4:2:0 chroma subsampling
 
 typedef struct _jpeg_data *JpgData;
+
+typedef unsigned char JpgByte;
+
+typedef struct _jpeg_data{
+	// output filename
+	char *output_filename;
+	char *input_filename;
+
+	// properties of the JPEG image
+	int width;
+	int height;
+
+	// these variables control the quality of the image
+	int sample_ratio;
+	int quality;
+
+	// number of blocks in each colour channel
+	int num_blocks_Y;
+	int num_blocks_Cb;
+	int num_blocks_Cr;
+
+	// values of each colour channel
+	Block *Y;
+	Block *Cb;
+	Block *Cr;
+
+	// blocks to store the chroma
+	Block *downsample_Cb;
+	Block *downsample_Cr;
+} JpegData;
 
 /*
 	Takes a bmp filename as input and writes JPEG image to disk.
@@ -44,7 +76,7 @@ void encode_bmp_to_jpeg(const char *input, const char *output, int quality, int 
 	Output:
 	* A jpeg image built from the RGB colours.
 */
-void encode_rgb_to_jpeg(Byte *colours, const char *output, int quality, int sample_ratio);
+void encode_rgb_to_jpeg(JpgByte *colours, const char *output, int quality, int sample_ratio);
 
 
 #endif

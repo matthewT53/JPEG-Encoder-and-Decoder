@@ -1,10 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define "jpgEncode.h"
-#include "preprocess.h"
-#include "bitmap.h"
-#include "block.h"
+#include "include/jpgEncode.h"
+#include "include/preprocess.h"
+#include "include/bitmap.h"
+#include "include/block.h"
 
 // #define DEBUG_PRE
 
@@ -22,11 +22,14 @@ void level_shift(JpgData j_data);
 // converts block number to starting and ending coordinates (x,y)
 void blockToCoords(int bn, int *x, int *y, unsigned int w);
 
-void preprocess_jpeg(JpgData j_data, char *input_filename)
+void preprocess_jpeg(JpgData j_data)
 {
     BmpImage bmp = NULL;
     int extra_width = 0, extra_height = 0;
     int i = 0;
+    char *input_filename = NULL;
+
+    input_filename = j_data->input_filename;
 
     // get the array of pixels
     bmp = bmp_OpenBitmap(input_filename);
@@ -141,7 +144,7 @@ void convert_blocks(JpgData j_data, BmpImage bmp, int extra_width, int extra_hei
     }
 
     // fill in the remaining pixels
-    if ( example_height ){
+    if ( extra_height ){
         for ( i = original_num_pixels; i < num_pixels_new; i++ ){
             r_new[i] = r_new[original_num_pixels - 1];
             g_new[i] = g_new[original_num_pixels - 1];

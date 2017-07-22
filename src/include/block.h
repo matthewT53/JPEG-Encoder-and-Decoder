@@ -17,17 +17,17 @@ Block newBlock();
 /*
 	Returns the value at a specific position (x,y)
 */
-double getValueBlock(Block b, int x, int y);
+float getValueBlock(Block b, int x, int y);
 
 /*
     Sets the value at a specific position (x,y)
 */
-void setValueBlock(Block b, int x, int y, int v);
+void setValueBlock(Block b, int x, int y, float v);
 
 /*
     Displays the contents of the blocks
 */
-double showBlock(Block b);
+void showBlock(Block b);
 
 /*
 	Frees all memory used a block

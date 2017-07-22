@@ -1,16 +1,26 @@
 CC=gcc
 CFLAGS=-Wall -Werror -std=c99 -c -g
+LIBFLAGS=-lm -pg
 
 all: jpeg
 
-jpeg: jpgDriver.o jpgEncode.o
-	$(CC) jpgDriver.o jpgEncode.o -o jpg -lm -pg -g
+jpeg: jpgDriver.o jpgEncode.o block.o bitmap.o preprocess.o
+	$(CC) jpgEncode.o block.o bitmap.o preprocess.o jpgDriver.o -o jpg $(LIBFLAGS)
 
 jpgDriver.o: jpgDriver.c
-	$(CC) $(CFLAGS) jpgDriver.c -g
+	$(CC) $(CFLAGS) jpgDriver.c
 
 jpgEncode.o: jpgEncode.c
-	$(CC) $(CFLAGS) jpgEncode.c -g
+	$(CC) $(CFLAGS) jpgEncode.c
+
+block.o: block.c
+	$(CC) $(CFLAGS) block.c
+
+bitmap.o: bitmap.c
+	$(CC) $(CFLAGS) bitmap.c
+
+preprocess.o: preprocess.c
+	$(CC) $(CFLAGS) preprocess.c
 
 clean:
 	rm -f *.o jpg

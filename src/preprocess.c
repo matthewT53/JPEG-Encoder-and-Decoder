@@ -101,7 +101,7 @@ void determine_resolutions(JpgData j_data, int *num_extra_bytes_width, int *num_
 void convert_blocks(JpgData j_data, BmpImage bmp, int extra_width, int extra_height)
 {
     int i = 0, j = 0;
-    int original_width = 0, original_height = 0;
+    int original_width = 0;
     Byte *r = NULL, *b = NULL, *g = NULL;
     Byte *r_new = NULL, *b_new = NULL, *g_new = NULL;
     int original_num_pixels = 0;
@@ -120,7 +120,6 @@ void convert_blocks(JpgData j_data, BmpImage bmp, int extra_width, int extra_hei
 
     // convert RGB => YUV
     original_width      = j_data->width - extra_width;
-    original_height     = j_data->height - extra_height;
     original_num_pixels = bmp_GetNumPixels(bmp);
 
     // create new RGB buffers to accomodate for resolution changes
@@ -146,9 +145,9 @@ void convert_blocks(JpgData j_data, BmpImage bmp, int extra_width, int extra_hei
     // fill in the remaining pixels
     if ( extra_height ){
         for ( i = original_num_pixels; i < num_pixels_new; i++ ){
-            r_new[i] = r_new[original_num_pixels - 1];
-            g_new[i] = g_new[original_num_pixels - 1];
-            b_new[i] = b_new[original_num_pixels - 1];
+            r_new[i] = r_new[i - j_data->width];
+            g_new[i] = g_new[i - j_data->width];
+            b_new[i] = b_new[i - j_data->width];
         }
     }
 
@@ -158,13 +157,13 @@ void convert_blocks(JpgData j_data, BmpImage bmp, int extra_width, int extra_hei
         for ( y = 0; y < 8; y++ ){
             for ( x = 0; x < 8; x++ ){
                 offset   = ((y + y_coords[0]) * original_width) + (x_coords[0] + x);
-                y_value  = 0.299 * r + 0.587 * g + 0.114 * b;
-                cb_value = 128 - (0.168736 * r - 0.331264 * g + 0.5 * b);
-                cr_value = 128 + (0.5 * r - 0.418688 * g - 0.081312 * b);
+                y_value  = 0.299 * r_new[offset] + 0.587 * g_new[offset] + 0.114 * b_new[offset];
+                cb_value = 128 - (0.168736 * r_new[offset] - 0.331264 * g_new[offset] + 0.5 * b_new[offset]);
+                cr_value = 128 + (0.5 * r_new[offset] - 0.418688 * g_new[offset] - 0.081312 * b_new[offset]);
 
-                setValueBlock(b, x, y, y_value);
-                setValueBlock(b, x, y, cb_value);
-                setValueBlock(b, x, y, cr_value);
+                setValueBlock(j_data->Y[i], x, y, y_value);
+                setValueBlock(j_data->Cb[i], x, y, cb_value);
+                setValueBlock(j_data->Cr[i], x, y, cr_value);
             }
         }
     }
@@ -174,13 +173,13 @@ void convert_blocks(JpgData j_data, BmpImage bmp, int extra_width, int extra_hei
     free(b_new);
 }
 
-void levelShift(JpgData j_data)
+void level_shift(JpgData j_data)
 {
     int i = 0, n = 0;
     int x = 0, y = 0;
     float new_Y = 0.0, new_Cb = 0.0, new_Cr = 0.0;
 
-    n = j_data->num_blocks_Y
+    n = j_data->num_blocks_Y;
     for (i = 0; i < n; i++){
         for (y = 0; y < 8; y++){
             for (x = 0; x < 8; x++){

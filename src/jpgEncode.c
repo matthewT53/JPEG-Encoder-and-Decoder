@@ -1,14 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "include/jpgEncode.h"
-#include "include/preprocess.h"
-#include "include/block.h"
+#include "headers/jpgEncode.h"
+#include "headers/preprocess.h"
+#include "headers/block.h"
 
-/* ======================================= Main JPEG compression functions ============================== */
-
-// downsamples the image for more compression
-void chroma_subsample(JpgData j_data);
+/* ======================================= Checklist ============================== */
 
 // space to frequency transformation
 void dct();
@@ -28,7 +25,7 @@ void run_length();
 // main encoding process
 void huffman_encoding();
 
-/* ===================================== End of JPEG compression functions ======================= */
+/* ===================================== End of checklist ======================= */
 
 /* ===================================== Small helper functions ================================== */
 JpgData create_jpeg_data(void);
@@ -51,7 +48,7 @@ void encode_bmp_to_jpeg(const char *input, const char *output, int quality, int 
 		preprocess_jpeg(j_data);
 
 		// downsample the image
-		//chroma_subsample(j_data);
+		// chroma_subsample(j_data);
 	}
 }
 

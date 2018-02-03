@@ -7,10 +7,19 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "include/jpgEncode.h"
-#include "include/bitmap.h"
+#include "headers/jpgEncode.h"
+#include "headers/bitmap.h"
+
+void test_bitmap(void);
+void test_jpeg(void);
 
 int main(void)
+{
+	// test_bitmap();
+	test_jpeg();
+}
+
+void test_bitmap(void)
 {
 	int i = 0;
 	Byte *r = NULL, *b = NULL, *g = NULL;
@@ -29,6 +38,9 @@ int main(void)
 
 	bmp_GetLastError(bmp);
 	bmp_DestroyBitmap(bmp);
+}
 
-	return EXIT_SUCCESS;
+void test_jpeg(void)
+{
+	encode_bmp_to_jpeg("images/redFlowers.bmp", "output/new.jpg", 50, HORIZONTAL_VERTICAL_SUBSAMPLING);
 }

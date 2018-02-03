@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "include/bitmap.h"
+#include "headers/bitmap.h"
 
 #define BMP_MAX_LEN 500
 

@@ -50,11 +50,8 @@ typedef struct _jpeg_data{
 	Takes a bmp filename as input and writes JPEG image to disk.
 
 	Input:
-		jpgFile: name of jpg file to create
-		rgbBuffer: array of Pixels
-		numPixels: number of pixels in rgbBuffer i.e sizeof(rgbBuffer)
-		width: width of the jpg image to create (x-direction)
-		height: height of the image to create (y-direction)
+		input: name of the BMP file 
+		output: name of the JPEG file to create
 		quality: a value between 1 and 100 (inclusive). This specifies the quality of the image and effects compression and hence impacts size of the jpg image.
 		sampleRatio: refers to how much colour information should be discarded from the JPEG image.
 				 Pass in one of the chroma subsampling constants as defiend at the top of this header file.

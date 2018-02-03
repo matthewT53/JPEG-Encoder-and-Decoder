@@ -1,10 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "include/jpgEncode.h"
-#include "include/preprocess.h"
-#include "include/bitmap.h"
-#include "include/block.h"
+#include "headers/jpgEncode.h"
+#include "headers/preprocess.h"
+#include "headers/bitmap.h"
+#include "headers/block.h"
 
 // #define DEBUG_PRE
 

@@ -15,5 +15,4 @@
 */
 void chroma_subsample(JpgData j_data);
 
-
 #endif

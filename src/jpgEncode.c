@@ -4,6 +4,7 @@
 #include "headers/jpgEncode.h"
 #include "headers/preprocess.h"
 #include "headers/block.h"
+#include "headers/downsample.h"
 
 /* ======================================= Checklist ============================== */
 
@@ -48,7 +49,7 @@ void encode_bmp_to_jpeg(const char *input, const char *output, int quality, int 
 		preprocess_jpeg(j_data);
 
 		// downsample the image
-		// chroma_subsample(j_data);
+		chroma_subsample(j_data);
 	}
 }
 

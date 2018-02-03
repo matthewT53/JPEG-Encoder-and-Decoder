@@ -116,7 +116,7 @@ void convert_blocks(JpgData j_data, BmpImage bmp, int extra_width, int extra_hei
     g = bmp_GetGreen(bmp);
     b = bmp_GetBlue(bmp);
 
-    bmp_GetLastError(bmp);
+    // bmp_GetLastError(bmp);
 
     // convert RGB => YUV
     original_width      = j_data->width - extra_width;
@@ -161,9 +161,9 @@ void convert_blocks(JpgData j_data, BmpImage bmp, int extra_width, int extra_hei
                 cb_value = 128 - (0.168736 * r_new[offset] - 0.331264 * g_new[offset] + 0.5 * b_new[offset]);
                 cr_value = 128 + (0.5 * r_new[offset] - 0.418688 * g_new[offset] - 0.081312 * b_new[offset]);
 
-                setValueBlock(j_data->Y[i], x, y, y_value);
-                setValueBlock(j_data->Cb[i], x, y, cb_value);
-                setValueBlock(j_data->Cr[i], x, y, cr_value);
+                setValueBlock(j_data->Y[i-1], x, y, y_value);
+                setValueBlock(j_data->Cb[i-1], x, y, cb_value);
+                setValueBlock(j_data->Cr[i-1], x, y, cr_value);
             }
         }
     }

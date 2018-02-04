@@ -53,9 +53,9 @@ void preprocess_jpeg(JpgData j_data)
 
         // create all the blocks, mcus
         for (i = 0; i < j_data->num_blocks_Y; i++){
-            j_data->Y[i]  = newBlock();
-            j_data->Cb[i] = newBlock();
-            j_data->Cr[i] = newBlock();
+            j_data->Y[i]  = new_block();
+            j_data->Cb[i] = new_block();
+            j_data->Cr[i] = new_block();
         }
 
         convert_blocks(j_data, bmp, extra_width, extra_height);
@@ -109,7 +109,7 @@ void convert_blocks(JpgData j_data, BmpImage bmp, int extra_width, int extra_hei
     int x_coords[2] = {0}, y_coords[2] = {0};
     int x = 0, y = 0;
     int offset = 0;
-    float y_value = 0.0, cb_value = 0.0, cr_value = 0.0;
+    double y_value = 0.0, cb_value = 0.0, cr_value = 0.0;
 
     // get the RGB colour channels
     r = bmp_GetRed(bmp);
@@ -161,9 +161,9 @@ void convert_blocks(JpgData j_data, BmpImage bmp, int extra_width, int extra_hei
                 cb_value = 128 - (0.168736 * r_new[offset] - 0.331264 * g_new[offset] + 0.5 * b_new[offset]);
                 cr_value = 128 + (0.5 * r_new[offset] - 0.418688 * g_new[offset] - 0.081312 * b_new[offset]);
 
-                setValueBlock(j_data->Y[i-1], x, y, y_value);
-                setValueBlock(j_data->Cb[i-1], x, y, cb_value);
-                setValueBlock(j_data->Cr[i-1], x, y, cr_value);
+                set_value_block(j_data->Y[i-1], x, y, y_value);
+                set_value_block(j_data->Cb[i-1], x, y, cb_value);
+                set_value_block(j_data->Cr[i-1], x, y, cr_value);
             }
         }
     }
@@ -177,19 +177,19 @@ void level_shift(JpgData j_data)
 {
     int i = 0, n = 0;
     int x = 0, y = 0;
-    float new_Y = 0.0, new_Cb = 0.0, new_Cr = 0.0;
+    double new_Y = 0.0, new_Cb = 0.0, new_Cr = 0.0;
 
     n = j_data->num_blocks_Y;
     for (i = 0; i < n; i++){
         for (y = 0; y < 8; y++){
             for (x = 0; x < 8; x++){
-                new_Y  = getValueBlock(j_data->Y[i], x, y) - 128;
-                new_Cb = getValueBlock(j_data->Cb[i], x, y) - 128;
-                new_Cr = getValueBlock(j_data->Cr[i], x, y) - 128;
+                new_Y  = get_value_block(j_data->Y[i], x, y) - 128;
+                new_Cb = get_value_block(j_data->Cb[i], x, y) - 128;
+                new_Cr = get_value_block(j_data->Cr[i], x, y) - 128;
 
-                setValueBlock(j_data->Y[i], x, y, new_Y);
-                setValueBlock(j_data->Cb[i], x, y, new_Cb);
-                setValueBlock(j_data->Cr[i], x, y, new_Cr);
+                set_value_block(j_data->Y[i], x, y, new_Y);
+                set_value_block(j_data->Cb[i], x, y, new_Cb);
+                set_value_block(j_data->Cr[i], x, y, new_Cr);
             }
         }
     }

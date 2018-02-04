@@ -4,8 +4,8 @@ LIBFLAGS=-lm -pg
 
 all: jpeg
 
-jpeg: jpgDriver.o jpgEncode.o block.o bitmap.o preprocess.o
-	$(CC) jpgEncode.o block.o bitmap.o preprocess.o jpgDriver.o -o jpg $(LIBFLAGS)
+jpeg: jpgDriver.o jpgEncode.o block.o bitmap.o preprocess.o downsample.o dct.o
+	$(CC) jpgEncode.o block.o bitmap.o preprocess.o downsample.o dct.o jpgDriver.o -o jpg $(LIBFLAGS)
 
 jpgDriver.o: jpgDriver.c
 	$(CC) $(CFLAGS) jpgDriver.c
@@ -21,6 +21,12 @@ bitmap.o: bitmap.c
 
 preprocess.o: preprocess.c
 	$(CC) $(CFLAGS) preprocess.c
+
+downsample.o: downsample.c
+	$(CC) $(CFLAGS) downsample.c
+
+dct.o: dct.c
+	$(CC) $(CFLAGS) dct.c
 
 clean:
 	rm -f *.o jpg

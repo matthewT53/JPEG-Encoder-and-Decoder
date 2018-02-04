@@ -13,26 +13,41 @@
 #define NUM_COEFFICIENTS_ROW 8
 
 typedef struct _block{
-	float values[NUM_COEFFICIENTS];
+	double values[NUM_COEFFICIENTS];
 } block;
 
 // returns a new block
-Block newBlock()
+Block new_block()
 {
 	return malloc(sizeof(block));
 }
 
-float getValueBlock(Block b, int x, int y)
+double get_value_block(Block b, int x, int y)
 {
 	return b->values[y * NUM_COEFFICIENTS_ROW + x];
 }
 
-void setValueBlock(Block b, int x, int y, float v)
+void set_value_block(Block b, int x, int y, double v)
 {
 	b->values[ (y * NUM_COEFFICIENTS_ROW) + x ] = v;
 }
 
-void showBlock(Block b)
+Block copy_block(Block b)
+{
+	Block copy_block = new_block();
+
+	int x = 0, y = 0;
+
+	for (x = 0; x < NUM_COEFFICIENTS_ROW; x++){
+		for (y = 0; y < NUM_COEFFICIENTS_ROW; y++){
+			set_value_block(copy_block, x, y, get_value_block(b, x, y));
+		}
+	}
+
+	return copy_block;
+}
+
+void show_block(Block b)
 {
 	int i = 0;
 	for (i = 0; i < NUM_COEFFICIENTS; i++){
@@ -40,13 +55,13 @@ void showBlock(Block b)
 			printf("\n");
 		}
 
-		printf("%5.2f ", b->values[i]);
+		printf("%8.2f ", b->values[i]);
 	}
 
 	printf("\n");
 }
 
-void destroyBlock(Block b)
+void destroy_block(Block b)
 {
 	free(b);
 }

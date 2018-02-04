@@ -12,26 +12,31 @@ typedef struct _block *Block;
 /*
 	Allocates memory for a new block
 */
-Block newBlock();
+Block new_block();
 
 /*
 	Returns the value at a specific position (x,y)
 */
-float getValueBlock(Block b, int x, int y);
+double get_value_block(Block b, int x, int y);
 
 /*
     Sets the value at a specific position (x,y)
 */
-void setValueBlock(Block b, int x, int y, float v);
+void set_value_block(Block b, int x, int y, double v);
+
+/*
+    Returns a copy of the specified block
+*/
+Block copy_block(Block b);
 
 /*
     Displays the contents of the blocks
 */
-void showBlock(Block b);
+void show_block(Block b);
 
 /*
 	Frees all memory used a block
 */
-void destroyBlock(Block b);
+void destroy_block(Block b);
 
 #endif

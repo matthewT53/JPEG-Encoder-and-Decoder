@@ -11,6 +11,7 @@
 #include "headers/bitmap.h"
 #include "headers/block.h"
 #include "headers/dct.h"
+#include "headers/quantise.h"
 
 void test_bitmap(void);
 void test_jpeg(void);
@@ -20,7 +21,6 @@ int main(void)
 {
 	// test_bitmap();
 	// test_jpeg();
-
 	test_dct();
 }
 
@@ -54,6 +54,7 @@ void test_dct(void)
 {
 	Block b = new_block();
 
+	// compare with the one in Wikipedia
 	set_value_block(b, 0, 0, -76);
 	set_value_block(b, 1, 0, -73);
 	set_value_block(b, 2, 0, -67);
@@ -132,4 +133,7 @@ void test_dct(void)
 
 	show_block(b);
 
+	quantise_lum(b);
+
+	show_block(b);
 }

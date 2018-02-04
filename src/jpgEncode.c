@@ -5,15 +5,10 @@
 #include "headers/preprocess.h"
 #include "headers/block.h"
 #include "headers/downsample.h"
+#include "headers/dct.h"
+#include "headers/quantise.h"
 
 /* ======================================= Checklist ============================== */
-
-// space to frequency transformation
-void dct();
-
-// removes redundant information
-void quantise();
-
 // reorders the coefficients in the block
 void zig_zag();
 
@@ -50,6 +45,14 @@ void encode_bmp_to_jpeg(const char *input, const char *output, int quality, int 
 
 		// downsample the image
 		chroma_subsample(j_data);
+
+		// perform DCT on the image data
+		dct(j_data);
+
+		// quantise the image data
+		quantise(j_data);
+
+		// perform entropy encoding 
 	}
 }
 

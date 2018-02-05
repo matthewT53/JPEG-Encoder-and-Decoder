@@ -40,7 +40,7 @@ void encode_bmp_to_jpeg(const char *input, const char *output, int quality, int 
 		j_data->output_filename = (char *) output;
 		j_data->input_filename =  (char *) input;
 
-		// convert RGb to YCbCr
+		// convert RGB to YCbCr
 		preprocess_jpeg(j_data);
 
 		// downsample the image
@@ -52,7 +52,7 @@ void encode_bmp_to_jpeg(const char *input, const char *output, int quality, int 
 		// quantise the image data
 		quantise(j_data);
 
-		// perform entropy encoding 
+		// perform entropy encoding
 	}
 }
 

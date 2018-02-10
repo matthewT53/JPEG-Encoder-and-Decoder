@@ -45,7 +45,15 @@ void zig_zag(JpgData j_data)
     }
 }
 
-void zig_zag_block(Block b)
+void zig_zag_block(Block b, int *zz)
 {
     printf("Zig zag ordering block:\n");
+
+    int i = 0, j = 0;
+
+    for (i = 0; i < 8; i++){
+        for (j = 0; j < 8; j++){
+            zz[ scan_order[i][j] ] = (int) get_value_block(b, i, j);
+        }
+    }
 }

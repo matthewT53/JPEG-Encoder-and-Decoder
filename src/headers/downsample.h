@@ -7,7 +7,7 @@
 #ifndef DOWN_SAMPLE_H
 #define DOWN_SAMPLE_H
 
-#include "jpgEncode.h"
+#include "jpg_encode.h"
 
 /*
     Input:

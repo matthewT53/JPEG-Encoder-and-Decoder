@@ -1,17 +1,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "headers/jpgEncode.h"
+#include "headers/jpg_encode.h"
 #include "headers/preprocess.h"
 #include "headers/block.h"
 #include "headers/downsample.h"
 #include "headers/dct.h"
 #include "headers/quantise.h"
+#include "headers/zig_zag.h"
 
 /* ======================================= Checklist ============================== */
-// reorders the coefficients in the block
-void zig_zag();
-
 // encoding of the DC coefficients
 void dpcm();
 

@@ -1,7 +1,7 @@
 #ifndef QUANTISE_H
 #define QUANTISE_H
 
-#include "jpgEncode.h"
+#include "jpg_encode.h"
 #include "block.h"
 
 #define TABLE_SIZE 8

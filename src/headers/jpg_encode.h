@@ -41,16 +41,19 @@ typedef struct _jpeg_data{
 	Block *Cb;
 	Block *Cr;
 
-	// blocks to store the chroma
-	Block *downsample_Cb;
-	Block *downsample_Cr;
+	// zig zag data
+	int **zig_zag_Y;
+	int **zig_zag_Cb;
+	int **zig_zag_Cr;
+
+	// huffman encoding data 
 } JpegData;
 
 /*
 	Takes a bmp filename as input and writes JPEG image to disk.
 
 	Input:
-		input: name of the BMP file 
+		input: name of the BMP file
 		output: name of the JPEG file to create
 		quality: a value between 1 and 100 (inclusive). This specifies the quality of the image and effects compression and hence impacts size of the jpg image.
 		sampleRatio: refers to how much colour information should be discarded from the JPEG image.

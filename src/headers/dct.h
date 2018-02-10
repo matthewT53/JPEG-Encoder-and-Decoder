@@ -1,7 +1,7 @@
 #ifndef DCT_H
 #define DCT_H
 
-#include "jpgEncode.h"
+#include "jpg_encode.h"
 #include "block.h"
 
 // performs a discrete cosine transformation on the YUV data

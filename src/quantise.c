@@ -24,6 +24,7 @@ int q_table_chr[TABLE_SIZE][TABLE_SIZE] = {{17, 18, 24, 47, 99, 99, 99, 99},
 											 {99, 99, 99, 99, 99, 99, 99, 99},
 									         {99, 99, 99, 99, 99, 99, 99, 99}};
 
+// scales the quantization tables according to the quality setting
 void scale_table(int q_table[TABLE_SIZE][TABLE_SIZE], int quality);
 
 void quantise(JpgData j_data)

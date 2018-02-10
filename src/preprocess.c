@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "headers/jpgEncode.h"
+#include "headers/jpg_encode.h"
 #include "headers/preprocess.h"
 #include "headers/bitmap.h"
 #include "headers/block.h"

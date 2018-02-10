@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <math.h>
 
-#include "headers/jpgEncode.h"
+#include "headers/jpg_encode.h"
 #include "headers/block.h"
 #include "headers/dct.h"
 

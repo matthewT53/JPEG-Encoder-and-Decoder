@@ -12,6 +12,7 @@
 #include "headers/block.h"
 #include "headers/dct.h"
 #include "headers/quantise.h"
+#include "headers/zig_zag.h"
 
 void test_bitmap(void);
 void test_jpeg(void);
@@ -53,6 +54,7 @@ void test_jpeg(void)
 void test_dct(void)
 {
 	Block b = new_block();
+	int i = 0;
 
 	// compare with the one in Wikipedia
 	set_value_block(b, 0, 0, -76);
@@ -129,11 +131,20 @@ void test_dct(void)
 
 	show_block(b);
 
+	// test discrete cosine transformation
 	dct_block(b);
-
 	show_block(b);
 
+	// test quantization
 	quantise_lum(b);
-
 	show_block(b);
+
+	// test zig-zag ordering
+	int a[64] = {0};
+	zig_zag_block(b, a);
+
+	printf("Testing zig-zag ordering: \n");
+	for (i = 0; i < 64; i++){
+		printf("%d\n", a[i]);
+	}
 }

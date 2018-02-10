@@ -53,7 +53,7 @@ void zig_zag_block(Block b, int *zz)
 
     for (i = 0; i < 8; i++){
         for (j = 0; j < 8; j++){
-            zz[ scan_order[i][j] ] = (int) get_value_block(b, i, j);
+            zz[ scan_order[i][j] ] = (int) get_value_block(b, j, i);
         }
     }
 }

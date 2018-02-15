@@ -8,11 +8,9 @@
 #include "headers/dct.h"
 #include "headers/quantise.h"
 #include "headers/zig_zag.h"
+#include "headers/dpcm.h"
 
 /* ======================================= Checklist ============================== */
-// encoding of the DC coefficients
-void dpcm();
-
 // encoding of the AC coefficients
 void run_length();
 
@@ -50,7 +48,11 @@ void encode_bmp_to_jpeg(const char *input, const char *output, int quality, int 
 		// quantise the image data
 		quantise(j_data);
 
-		// perform entropy encoding
+		// perform zig-zag ordering
+		zig_zag(j_data);
+
+		// perform DPCM
+		dpcm(j_data);
 	}
 }
 

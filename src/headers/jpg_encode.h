@@ -18,6 +18,11 @@ typedef struct _jpeg_data *JpgData;
 
 typedef unsigned char JpgByte;
 
+typedef struct _huffman_data{
+	int freq[257];
+	int code_len[257];
+} HuffmanData;
+
 typedef struct _jpeg_data{
 	// output filename
 	char *output_filename;
@@ -46,7 +51,12 @@ typedef struct _jpeg_data{
 	int **zig_zag_Cb;
 	int **zig_zag_Cr;
 
-	// huffman encoding data 
+	// huffman encoding data
+	HuffmanData lum_DC;
+	HuffmanData lum_AC;
+
+	HuffmanData chrom_DC;
+	HuffmanData chrom_AC;
 } JpegData;
 
 /*

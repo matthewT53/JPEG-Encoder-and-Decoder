@@ -21,6 +21,7 @@ typedef unsigned char JpgByte;
 typedef struct _huffman_data{
 	int freq[257];
 	int code_len[257];
+	int others[257];
 } HuffmanData;
 
 typedef struct _jpeg_data{

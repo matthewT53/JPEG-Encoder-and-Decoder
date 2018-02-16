@@ -1,8 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 
 #include "headers/huffman.h"
 #include "headers/block.h"
+
+// intializes huffman data structures
+void initialize_huffman(JpgData j_data);
 
 // calculates frequencies for a block of image data
 void calculate_freq_block_DC(HuffmanData *huffman_data, int *image_data);
@@ -10,8 +14,11 @@ void calculate_freq_block_DC(HuffmanData *huffman_data, int *image_data);
 // performs run length encoding on the AC coefficients
 void calculate_freq_block_AC(HuffmanData *huffman_data, int *image_data);
 
-// intializes huffman data structures
-void initialize_huffman(JpgData j_data);
+// returns the class of a value
+int get_class(int value);
+
+// constructs the huffman table for the image data
+void construct_huffman_table(JpgData j_data);
 
 void huffman_encode(JpgData j_data)
 {
@@ -52,7 +59,61 @@ void initialize_huffman(JpgData j_data)
     }
 }
 
-void calculate_freq_block(HuffmanData *huffman_data, int *image_data)
+void construct_huffman_table(JpgData j_data)
 {
+    
+}
 
+void calculate_freq_block_DC(HuffmanData *huffman_data, int *image_data)
+{
+    huffman_data->freq[get_class(image_data[0])]++;
+}
+
+void calculate_freq_block_AC(HuffmanData *huffman_data, int *image_data)
+{
+    int i = 0;
+    int num_zeroes = 0;
+    int last_non_zero_index = 0;
+
+    // find the last non-zero coefficient
+    for (i = 63; i > 0; i--){
+        if (image_data[i] != 0){
+            last_non_zero_index = i;
+            break;
+        }
+    }
+
+    // perform run length encoding
+    for (i = 1; i < 64; i++){
+        if (image_data[i] == 0){
+            num_zeroes++;
+            if (num_zeroes == 16){
+                huffman_data->freq[0xF0]++; // ZRL
+                num_zeroes = 0;
+            }
+        }
+
+        else if (i == last_non_zero_index){
+            huffman_data->freq[0x00]++; // EOB
+            break;
+        }
+
+        else{
+            huffman_data->freq[num_zeroes | get_class(image_data[i])]++;
+            num_zeroes = 0;
+        }
+    }
+}
+
+int get_class(int value)
+{
+    int class = 0;
+    value = (int) abs(value);
+
+    while (value > 0){
+        value >>= 1;
+        class++;
+    }
+
+    return class;
 }

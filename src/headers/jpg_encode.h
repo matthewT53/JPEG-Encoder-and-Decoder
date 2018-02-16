@@ -16,9 +16,10 @@
 
 typedef struct _jpeg_data *JpgData;
 
-typedef unsigned char JpgByte;
+typedef unsigned char Byte;
 
 typedef struct _huffman_data{
+	// index is: run_length | size
 	int freq[257];
 	int code_len[257];
 	int others[257];
@@ -73,7 +74,7 @@ typedef struct _jpeg_data{
 	Output:
 		JPEG image is written to disk.
 */
-void encode_bmp_to_jpeg(const char *input, const char *output, int quality, int sample_ratio);
+void encode_bmp_to_jpeg(const char *input_filename, const char *output_filename, int quality, int sample_ratio);
 
 /*
 	Takes in an array of RGB values in memory and writes it to a JPEG image on disk.
@@ -87,7 +88,7 @@ void encode_bmp_to_jpeg(const char *input, const char *output, int quality, int 
 	Output:
 	* A jpeg image built from the RGB colours.
 */
-void encode_rgb_to_jpeg(JpgByte *colours, const char *output, int quality, int sample_ratio);
+void encode_rgb_to_jpeg(Byte *colours, const char *output, int quality, int sample_ratio);
 
 
 #endif

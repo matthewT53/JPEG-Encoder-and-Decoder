@@ -4,8 +4,8 @@ LIBFLAGS=-lm -pg
 
 all: jpeg
 
-jpeg: jpg_driver.o jpg_encode.o block.o bitmap.o preprocess.o downsample.o dct.o quantise.o zig_zag.o dpcm.o
-	$(CC) jpg_encode.o block.o bitmap.o preprocess.o downsample.o dct.o jpg_driver.o quantise.o zig_zag.o dpcm.o -o jpg $(LIBFLAGS)
+jpeg: jpg_driver.o jpg_encode.o block.o bitmap.o preprocess.o downsample.o dct.o quantise.o zig_zag.o dpcm.o huffman.o
+	$(CC) jpg_encode.o block.o bitmap.o preprocess.o downsample.o dct.o jpg_driver.o quantise.o zig_zag.o dpcm.o huffman.o -o jpg $(LIBFLAGS)
 
 jpg_driver.o: jpg_driver.c
 	$(CC) $(CFLAGS) jpg_driver.c
@@ -36,6 +36,9 @@ zig_zag.o: zig_zag.c
 
 dpcm.o: dpcm.c
 	$(CC) $(CFLAGS) dpcm.c
+
+huffman.o: huffman.c
+	$(CC) $(CFLAGS) huffman.c
 
 clean:
 	rm -f *.o jpg

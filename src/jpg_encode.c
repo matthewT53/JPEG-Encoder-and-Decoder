@@ -9,15 +9,7 @@
 #include "headers/quantise.h"
 #include "headers/zig_zag.h"
 #include "headers/dpcm.h"
-
-/* ======================================= Checklist ============================== */
-// encoding of the AC coefficients
-void run_length();
-
-// main encoding process
-void huffman_encoding();
-
-/* ===================================== End of checklist ======================= */
+#include "headers/huffman.h"
 
 /* ===================================== Small helper functions ================================== */
 JpgData create_jpeg_data(void);
@@ -53,6 +45,9 @@ void encode_bmp_to_jpeg(const char *input, const char *output, int quality, int 
 
 		// perform DPCM
 		dpcm(j_data);
+
+		// huffman encoding
+		huffman_encode(j_data);
 	}
 }
 

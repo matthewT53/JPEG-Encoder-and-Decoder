@@ -135,17 +135,17 @@ void calculate_freq_block_AC(HuffmanData *huffman_data, int *image_data)
 
     // perform run length encoding
     for (i = 1; i < 64; i++){
+        if (i == last_non_zero_index + 1){ // +1 because we don't want the coefficient
+            huffman_data->freq[0x00]++; // EOB
+            break;
+        }
+
         if (image_data[i] == 0){
             num_zeroes++;
             if (num_zeroes == 16){
                 huffman_data->freq[0xF0]++; // ZRL
                 num_zeroes = 0;
             }
-        }
-
-        else if (i == last_non_zero_index + 1){ // +1 because we don't want the coefficient
-            huffman_data->freq[0x00]++; // EOB
-            break;
         }
 
         else{

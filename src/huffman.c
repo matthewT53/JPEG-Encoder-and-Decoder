@@ -18,7 +18,7 @@ void calculate_freq_block_AC(HuffmanData *huffman_data, int *image_data);
 int get_class(int value);
 
 // constructs the huffman table for the image data
-void construct_huffman_table(JpgData j_data);
+void construct_huffman_table(HuffmanData *huffman_data);
 
 void huffman_encode(JpgData j_data)
 {
@@ -59,9 +59,59 @@ void initialize_huffman(JpgData j_data)
     }
 }
 
-void construct_huffman_table(JpgData j_data)
+void construct_huffman_table(HuffmanData *huffman_data)
 {
-    
+    int v1 = -1, v2 = -1;
+    int i = 0;
+
+    // find huffman code sizes
+    while (1){
+        // get an initial value for v1
+        for (i = 0; i < 257; i++){
+            if (huffman_data->freq[i] > 0){
+                v1 = i;
+                break;
+            }
+        }
+
+        // find smallest v1 such that freq[v1] > 0
+        for (i = 0; i < 257; i++){
+            if (huffman_data->freq[i] > 0 && huffman_data->freq[i] < huffman_data->freq[v1]){
+                v1 = i;
+            }
+        }
+
+        // find next smallest value v2 such that freq[v2] > 0
+        for (i = 0; i < 257; i++){
+            if (huffman_data->freq[i] > 0 && huffman_data->freq[i] < huffman_data->freq[v2] && v1 != v2){
+                v2 = i;
+            }
+        }
+
+        // v2 doesn't exist so we are done
+        if (v2 == -1){
+            break;
+        }
+
+        huffman_data->freq[v1] += huffman_data->freq[v2];
+        huffman_data->freq[v2] = 0;
+
+        huffman_data->code_len[v1]++;
+
+        while ( !huffman_data->others[v1] == -1 ){
+            huffman_data->code_len[v1]++;
+            v1 = huffman_data->others[v1];
+        }
+
+        huffman_data->others[v1] = v2;
+
+        huffman_data->code_len[v2]++;
+
+        while ( !huffman_data->others[v2] == -1 ){
+            huffman_data->code_len[v2]++;
+            v2 = huffman_data->others[v2];
+        }
+    }
 }
 
 void calculate_freq_block_DC(HuffmanData *huffman_data, int *image_data)
@@ -93,12 +143,13 @@ void calculate_freq_block_AC(HuffmanData *huffman_data, int *image_data)
             }
         }
 
-        else if (i == last_non_zero_index){
+        else if (i == last_non_zero_index + 1){ // +1 because we don't want the coefficient
             huffman_data->freq[0x00]++; // EOB
             break;
         }
 
         else{
+            // run length | code size
             huffman_data->freq[num_zeroes | get_class(image_data[i])]++;
             num_zeroes = 0;
         }

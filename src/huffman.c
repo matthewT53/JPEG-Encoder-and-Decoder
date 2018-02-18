@@ -40,6 +40,12 @@ void huffman_encode(JpgData j_data)
         calculate_freq_block_DC(&j_data->chrom_DC, j_data->zig_zag_Cr[i]);
         calculate_freq_block_AC(&j_data->chrom_AC, j_data->zig_zag_Cr[i]);
     }
+
+    construct_huffman_table(&j_data->lum_DC);
+    construct_huffman_table(&j_data->lum_AC);
+
+    construct_huffman_table(&j_data->chrom_DC);
+    construct_huffman_table(&j_data->chrom_AC);
 }
 
 void initialize_huffman(JpgData j_data)
@@ -171,8 +177,6 @@ void construct_huffman_table(HuffmanData *huffman_data)
             }
         }
     }
-
-    
 }
 
 void calculate_freq_block_DC(HuffmanData *huffman_data, int *image_data)

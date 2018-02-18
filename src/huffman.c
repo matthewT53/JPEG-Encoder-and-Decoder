@@ -63,6 +63,14 @@ void initialize_huffman(JpgData j_data)
         j_data->lum_DC.code_len[i] = j_data->lum_AC.code_len[i] = j_data->chrom_DC.code_len[i] = j_data->chrom_AC.code_len[i] = 0;
         j_data->lum_DC.others[i] = j_data->lum_AC.others[i] = j_data->chrom_DC.others[i] = j_data->chrom_AC.others[i] = -1;
     }
+
+    for (i = 0; i < 32; i++){
+        j_data->lum_AC.bits[i] = j_data->lum_DC.bits[i] = j_data->chrom_DC.bits[i] = j_data->chrom_AC.bits[i] = 0;
+    }
+
+    for (i = 0; i < 256; i++){
+        j_data->lum_DC.huffval[i] = j_data->lum_AC.huffval[i] = j_data->chrom_DC.huffval[i] = j_data->chrom_AC.huffval[i] = 0;
+    }
 }
 
 void construct_huffman_table(HuffmanData *huffman_data)
@@ -120,10 +128,6 @@ void construct_huffman_table(HuffmanData *huffman_data)
     }
 
     // find the number of codes of each size
-    for (i = 0; i < 32; i++){
-        huffman_data->bits[i] = 0;
-    }
-
     for (i = 0; i < 257; i++){
         if (huffman_data->code_len[i] != 0){
             huffman_data->bits[ huffman_data->code_len[i] ]++;
@@ -162,10 +166,6 @@ void construct_huffman_table(HuffmanData *huffman_data)
     }
 
     // sort the input values according to the code size
-    for (i = 0; i < 256; i++){
-        huffman_data->huffval[i] = 0;
-    }
-
     i = 1;
     int k = 0;
 

@@ -98,7 +98,7 @@ void construct_huffman_table(HuffmanData *huffman_data)
 
         huffman_data->code_len[v1]++;
 
-        while ( !huffman_data->others[v1] == -1 ){
+        while ( !(huffman_data->others[v1] == -1) ){
             huffman_data->code_len[v1]++;
             v1 = huffman_data->others[v1];
         }
@@ -107,11 +107,72 @@ void construct_huffman_table(HuffmanData *huffman_data)
 
         huffman_data->code_len[v2]++;
 
-        while ( !huffman_data->others[v2] == -1 ){
+        while ( !(huffman_data->others[v2] == -1) ){
             huffman_data->code_len[v2]++;
             v2 = huffman_data->others[v2];
         }
     }
+
+    // find the number of codes of each size
+    for (i = 0; i < 32; i++){
+        huffman_data->bits[i] = 0;
+    }
+
+    for (i = 0; i < 257; i++){
+        if (huffman_data->code_len[i] != 0){
+            huffman_data->bits[ huffman_data->code_len[i] ]++;
+        }
+    }
+
+    // adjust the bits such that no code is > 16 bits
+    i = 31;
+    int j = 0;
+    while (1){
+        if (huffman_data->bits[i] > 0){
+            j = i - 1;
+            do {
+                j--;
+            } while (! (huffman_data->bits[j] > 0) );
+
+            huffman_data->bits[i] -= 2;
+            huffman_data->bits[i-1]++;
+            huffman_data->bits[j+1] += 2;
+            huffman_data->bits[j]--;
+        }
+
+        else{
+            i--;
+
+            if (i == 16){
+                while (huffman_data->bits[i] == 0){
+                    i--;
+                }
+
+                huffman_data->bits[i]--;
+
+                break;
+            }
+        }
+    }
+
+    // sort the input values according to the code size
+    for (i = 0; i < 256; i++){
+        huffman_data->huffval[i] = 0;
+    }
+
+    i = 1;
+    int k = 0;
+
+    for (i = 0; i < 32; i++){
+        for (j = 0; j < 256; j++){
+            while (huffman_data->code_len[j] == i){
+                huffman_data->huffval[k] = j;
+                k++;
+            }
+        }
+    }
+
+    
 }
 
 void calculate_freq_block_DC(HuffmanData *huffman_data, int *image_data)

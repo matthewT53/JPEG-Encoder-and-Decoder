@@ -20,9 +20,17 @@ typedef unsigned char Byte;
 
 typedef struct _huffman_data{
 	// index is: run_length | size
+
+	// lists needed for finding code size
 	int freq[257];
 	int code_len[257];
 	int others[257];
+
+	// list needed for finding the number of codes of each length
+	int bits[32];
+
+	// list needed to sort the input values
+	int huffval[256];
 } HuffmanData;
 
 typedef struct _jpeg_data{
